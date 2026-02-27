@@ -1,0 +1,200 @@
+﻿import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { Link, useParams } from "react-router-dom";
+import { api } from "../api/client";
+import type { CharacterDto } from "../api/types";
+import { GameMode } from "../components/GameMode";
+import { Wizard } from "../components/Wizard";
+import { useToast } from "../context/ToastContext";
+import { useCharacterSocket } from "../hooks/useCharacterSocket";
+import { setByPath } from "../utils/setByPath";
+import NotFound from "./NotFound";
+
+export default function CharacterPage() {
+  const { uuid } = useParams();
+  const [character, setCharacter] = useState<CharacterDto | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const { pushToast } = useToast();
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+
+  const fetchCharacter = useCallback(async () => {
+    if (!uuid) return;
+    try {
+      const data = await api.get<CharacterDto>(`/characters/${uuid}`);
+      setCharacter(data);
+      setNotFound(false);
+    } catch (err: any) {
+      if (err?.status === 404) {
+        setNotFound(true);
+      } else {
+        pushToast(err?.message ?? "Не удалось загрузить персонажа", "error");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [uuid, pushToast]);
+
+  useEffect(() => {
+    fetchCharacter();
+  }, [fetchCharacter]);
+
+  const applyLocalPatch = useCallback((path: string, value: unknown) => {
+    setCharacter((prev) => {
+      if (!prev) return prev;
+      return setByPath(prev, path, value);
+    });
+  }, []);
+
+  const onPatchApplied = useCallback((payload: { path: string; value: unknown; version: number }) => {
+    setCharacter((prev) => {
+      if (!prev) return prev;
+      const next = setByPath(prev, payload.path, payload.value);
+      return { ...next, version: payload.version };
+    });
+  }, []);
+
+  const onResync = useCallback(
+    (payload?: { reason?: "rollback" | "server-change" }) => {
+      if (payload?.reason === "rollback") {
+        pushToast("Часть свободных очков была откатана из-за изменения бюджета", "info");
+      } else {
+        pushToast("Данные были обновлены сервером", "info");
+      }
+      fetchCharacter();
+    },
+    [fetchCharacter, pushToast]
+  );
+
+  const onReject = useCallback(
+    (errors: Array<{ path: string; message: string }>) => {
+      const message = errors?.[0]?.message || "Изменение отклонено сервером";
+      pushToast(message, "error");
+      fetchCharacter();
+    },
+    [fetchCharacter, pushToast]
+  );
+
+  const { sendPatch } = useCharacterSocket(uuid, {
+    onPatchApplied,
+    onResync,
+    onReject
+  });
+
+  const handlePatch = useCallback(
+    (path: string, value: unknown) => {
+      if (!character || !uuid) return;
+      const baseVersion = character.version;
+      applyLocalPatch(path, value);
+      sendPatch({
+        characterUuid: uuid,
+        baseVersion,
+        op: "set",
+        path,
+        value
+      });
+    },
+    [applyLocalPatch, character, sendPatch, uuid]
+  );
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      pushToast("Ссылка скопирована", "success");
+    } catch {
+      pushToast("Не удалось скопировать ссылку", "error");
+    }
+  };
+
+  const handleExport = async () => {
+    if (!uuid) return;
+    try {
+      const data = await api.get<Record<string, unknown>>(`/characters/${uuid}/export`);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `character-${uuid}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      pushToast("Экспорт выполнен", "success");
+    } catch (err: any) {
+      pushToast(err?.message ?? "Не удалось экспортировать", "error");
+    }
+  };
+
+  const handleImportFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !uuid) return;
+    try {
+      const text = await file.text();
+      const json = JSON.parse(text);
+      await api.post(`/characters/${uuid}/import`, json);
+      pushToast("Импорт выполнен", "success");
+      await fetchCharacter();
+    } catch (err: any) {
+      const message = err?.errors?.[0]?.message || err?.message || "Ошибка импорта";
+      pushToast(message, "error");
+    } finally {
+      event.target.value = "";
+    }
+  };
+
+  const characterName = useMemo(() => {
+    return character?.meta?.name?.trim() || "(Без имени)";
+  }, [character]);
+
+  if (loading) {
+    return (
+      <section className="page">
+        <h1>Персонаж</h1>
+        <p>Загрузка…</p>
+      </section>
+    );
+  }
+
+  if (notFound || !character) {
+    return <NotFound />;
+  }
+
+  return (
+    <section className="page">
+      <div className="card">
+        <div className="section-title">{characterName}</div>
+        <div className="page-actions">
+          <button type="button" onClick={handleCopy}>
+            Скопировать ссылку
+          </button>
+          <button type="button" onClick={handleExport}>
+            Экспорт JSON
+          </button>
+          <button type="button" onClick={() => importInputRef.current?.click()}>
+            Импорт JSON
+          </button>
+          <Link to={`/c/${character.uuid}/st`}>
+            <button type="button">Перейти в режим ведущего</button>
+          </Link>
+        </div>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept="application/json"
+          style={{ display: "none" }}
+          onChange={handleImportFile}
+        />
+      </div>
+
+      {!character.creationFinished ? (
+        <Wizard
+          character={character}
+          onPatch={handlePatch}
+          onStepChange={(step) =>
+            setCharacter((prev) => (prev ? { ...prev, wizard: { currentStep: step } } : prev))
+          }
+          refresh={fetchCharacter}
+        />
+      ) : (
+        <GameMode character={character} onPatch={handlePatch} />
+      )}
+    </section>
+  );
+}
