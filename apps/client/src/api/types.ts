@@ -24,10 +24,12 @@ export type GenerationDto = {
 
 export type MeritDto = DictItem & {
   pointCost: number;
+  description?: string;
 };
 
 export type FlawDto = DictItem & {
   pointCost: number;
+  description?: string;
 };
 
 export type ChronicleDto = {

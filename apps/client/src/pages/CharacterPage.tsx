@@ -75,6 +75,7 @@ export default function CharacterPage() {
   );
 
   const { sendPatch } = useCharacterSocket(uuid, {
+    currentVersion: character?.version,
     onPatchApplied,
     onResync,
     onReject
@@ -83,11 +84,9 @@ export default function CharacterPage() {
   const handlePatch = useCallback(
     (path: string, value: unknown) => {
       if (!character || !uuid) return;
-      const baseVersion = character.version;
       applyLocalPatch(path, value);
       sendPatch({
         characterUuid: uuid,
-        baseVersion,
         op: "set",
         path,
         value
@@ -159,20 +158,45 @@ export default function CharacterPage() {
   return (
     <section className="page">
       <div className="card">
-        <div className="section-title">{characterName}</div>
-        <div className="page-actions">
-          <button type="button" onClick={handleCopy}>
-            Скопировать ссылку
+        <div className="card-header">
+          <div className="section-title">{characterName}</div>
+          <div className="page-actions header-actions">
+          <button
+            type="button"
+            className="icon-button"
+            title="Скопировать ссылку"
+            aria-label="Скопировать ссылку"
+            onClick={handleCopy}
+          >
+            🔗
           </button>
-          <button type="button" onClick={handleExport}>
-            Экспорт JSON
+          <button
+            type="button"
+            className="icon-button"
+            title="Экспорт JSON"
+            aria-label="Экспорт JSON"
+            onClick={handleExport}
+          >
+            ⤓
           </button>
-          <button type="button" onClick={() => importInputRef.current?.click()}>
-            Импорт JSON
+          <button
+            type="button"
+            className="icon-button"
+            title="Импорт JSON"
+            aria-label="Импорт JSON"
+            onClick={() => importInputRef.current?.click()}
+          >
+            ⤒
           </button>
-          <Link to={`/c/${character.uuid}/st`}>
-            <button type="button">Перейти в режим ведущего</button>
+          <Link
+            to={`/c/${character.uuid}/st`}
+            className="icon-button"
+            title="Перейти в режим ведущего"
+            aria-label="Перейти в режим ведущего"
+          >
+            🎲
           </Link>
+          </div>
         </div>
         <input
           ref={importInputRef}
@@ -187,8 +211,16 @@ export default function CharacterPage() {
         <Wizard
           character={character}
           onPatch={handlePatch}
-          onStepChange={(step) =>
-            setCharacter((prev) => (prev ? { ...prev, wizard: { currentStep: step } } : prev))
+          onStepChange={(step, version) =>
+            setCharacter((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    wizard: { currentStep: step },
+                    version: typeof version === "number" ? version : prev.version + 1
+                  }
+                : prev
+            )
           }
           refresh={fetchCharacter}
         />

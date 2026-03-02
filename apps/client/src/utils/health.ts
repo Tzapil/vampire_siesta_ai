@@ -2,9 +2,10 @@
 
 export function buildHealthTrack(health: { bashing: number; lethal: number; aggravated: number }): HealthState[] {
   const track: HealthState[] = [];
-  for (let i = 0; i < health.bashing; i += 1) track.push("bashing");
-  for (let i = 0; i < health.lethal; i += 1) track.push("lethal");
+  // Most severe damage should appear first (aggravated -> lethal -> bashing).
   for (let i = 0; i < health.aggravated; i += 1) track.push("aggravated");
+  for (let i = 0; i < health.lethal; i += 1) track.push("lethal");
+  for (let i = 0; i < health.bashing; i += 1) track.push("bashing");
   while (track.length < 7) track.push("empty");
   return track.slice(0, 7);
 }

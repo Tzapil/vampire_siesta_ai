@@ -1,5 +1,5 @@
-﻿import "dotenv/config";
 import { connectToDatabase } from "./db/connection";
+import { loadEnv } from "./utils/loadEnv";
 import {
   AbilityModel,
   AttributeModel,
@@ -23,6 +23,8 @@ async function upsertByKey(model: any, items: Array<Record<string, any>>) {
     )
   );
 }
+
+loadEnv();
 
 async function seed() {
   await connectToDatabase(process.env.MONGO_URL);
@@ -151,13 +153,33 @@ async function seed() {
   ]);
 
   await upsertByKey(MeritModel, [
-    { key: "acuteSense", labelRu: "Острое чувство", pointCost: 1 },
-    { key: "catlikeBalance", labelRu: "Кошачья грация", pointCost: 2 }
+    {
+      key: "acuteSense",
+      labelRu: "Острое чувство",
+      pointCost: 1,
+      description: "Вы обладаете очень острыми чувствами."
+    },
+    {
+      key: "catlikeBalance",
+      labelRu: "Кошачья грация",
+      pointCost: 2,
+      description: "Вы сохраняете баланс в сложных условиях."
+    }
   ]);
 
   await upsertByKey(FlawModel, [
-    { key: "nightmares", labelRu: "Кошмары", pointCost: 1 },
-    { key: "darkSecret", labelRu: "Тёмная тайна", pointCost: 2 }
+    {
+      key: "nightmares",
+      labelRu: "Кошмары",
+      pointCost: 1,
+      description: "Вас мучают кошмары, влияющие на отдых."
+    },
+    {
+      key: "darkSecret",
+      labelRu: "Тёмная тайна",
+      pointCost: 2,
+      description: "У вас есть тайна, которую нужно скрывать."
+    }
   ]);
 
   console.log("Seed завершён");

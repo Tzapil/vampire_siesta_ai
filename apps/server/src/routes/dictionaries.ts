@@ -78,7 +78,9 @@ router.get(
 router.get(
   "/merits",
   asyncHandler(async (_req, res) => {
-    const items = await MeritModel.find().select("key labelRu pointCost -_id").lean();
+    const items = await MeritModel.find()
+      .select("key labelRu pointCost description -_id")
+      .lean();
     res.json(items);
   })
 );
@@ -86,7 +88,9 @@ router.get(
 router.get(
   "/flaws",
   asyncHandler(async (_req, res) => {
-    const items = await FlawModel.find().select("key labelRu pointCost -_id").lean();
+    const items = await FlawModel.find()
+      .select("key labelRu pointCost description -_id")
+      .lean();
     res.json(items);
   })
 );

@@ -11,6 +11,7 @@ import {
   loadDictionaries,
   recalcFlawFreebie,
   rollbackFreebies,
+  WIZARD_STEPS,
   validateRanges
 } from "./validation/characterValidation";
 
@@ -187,14 +188,21 @@ export function registerSocket(io: Server) {
           }
         }
 
-        const previousStep = character.wizard?.currentStep ?? 1;
-
-        setByPath(character, patch.path, patch.value);
-
         let resync = false;
         let rollback = false;
 
-        const stepForPath = getStepForPath(patch.path);
+        const previousStep = character.wizard?.currentStep ?? 1;
+
+        if (!character.creationFinished && character.wizard?.currentStep != null) {
+          if (character.wizard.currentStep > WIZARD_STEPS) {
+            character.wizard.currentStep = WIZARD_STEPS;
+            resync = true;
+          }
+        }
+
+        setByPath(character, patch.path, patch.value);
+
+        const stepForPath = getStepForPath(patch.path, character.wizard?.currentStep ?? 1);
         if (!character.creationFinished && stepForPath && character.wizard) {
           if (previousStep > stepForPath) {
             character.wizard.currentStep = stepForPath;
@@ -262,7 +270,9 @@ export function registerSocket(io: Server) {
           }
         }
 
-        const rangeErrors = validateRanges(character, dict);
+        const rangeErrors = validateRanges(character, dict, {
+          allowNonClanDisciplines: character.creationFinished
+        });
         if (rangeErrors.length > 0) {
           callback({ ok: false, errors: rangeErrors });
           return;

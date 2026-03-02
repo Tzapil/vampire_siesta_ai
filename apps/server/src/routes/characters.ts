@@ -77,6 +77,16 @@ router.post(
         demeanorKey: ""
       },
       creation: {
+        attributesPriority: {
+          physical: "primary",
+          social: "secondary",
+          mental: "tertiary"
+        },
+        abilitiesPriority: {
+          talents: "primary",
+          skills: "secondary",
+          knowledges: "tertiary"
+        },
         flawFreebieEarned: 0,
         freebieBuys: { humanity: 0, willpower: 0 }
       },
@@ -226,7 +236,7 @@ router.post(
     character.version += 1;
     await character.save();
 
-    res.json({ ok: true, currentStep: nextStep });
+    res.json({ ok: true, currentStep: nextStep, version: character.version });
   })
 );
 
@@ -245,7 +255,7 @@ router.post(
     character.version += 1;
     await character.save();
 
-    res.json({ ok: true, currentStep: nextStep });
+    res.json({ ok: true, currentStep: nextStep, version: character.version });
   })
 );
 
@@ -269,7 +279,7 @@ router.post(
     character.version += 1;
     await character.save();
 
-    res.json({ ok: true, currentStep: targetStep });
+    res.json({ ok: true, currentStep: targetStep, version: character.version });
   })
 );
 
@@ -303,8 +313,18 @@ router.post(
     const totalSelfControl = selfControl.base + selfControl.freebie + selfControl.storyteller;
     const totalCourage = courage.base + courage.freebie + courage.storyteller;
 
+    if (!character.derived) {
+      character.derived = await deriveFromGeneration(character.meta?.generation ?? 13);
+    }
+
     character.derived.startingHumanity = totalConscience + totalSelfControl;
     character.derived.startingWillpower = totalCourage;
+    character.resources = {
+      bloodPool: { current: character.derived.bloodPoolMax ?? 0 },
+      willpower: { current: character.derived.startingWillpower },
+      humanity: { current: character.derived.startingHumanity },
+      health: character.resources?.health ?? { bashing: 0, lethal: 0, aggravated: 0 }
+    };
     character.creationFinished = true;
     character.wizard = undefined;
     character.version += 1;

@@ -1,9 +1,11 @@
-﻿import "dotenv/config";
 import http from "http";
 import { Server as SocketIOServer } from "socket.io";
 import { createApp } from "./app";
 import { connectToDatabase } from "./db/connection";
 import { registerSocket } from "./socket";
+import { loadEnv } from "./utils/loadEnv";
+
+loadEnv();
 
 const port = Number(process.env.PORT) || 4000;
 

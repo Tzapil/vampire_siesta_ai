@@ -30,7 +30,7 @@ const ResourcesSchema = new Schema(
 
 const WizardSchema = new Schema(
   {
-    currentStep: { type: Number, required: true, min: 1, max: 9 }
+    currentStep: { type: Number, required: true, min: 1, max: 8 }
   },
   { _id: false }
 );
@@ -49,16 +49,16 @@ const CharacterSchema = new Schema(
     wizard: { type: WizardSchema, required: false },
 
     meta: {
-      name: { type: String, required: true, default: "", trim: true },
-      playerName: { type: String, required: true, default: "", trim: true },
+      name: { type: String, required: false, default: "", trim: true },
+      playerName: { type: String, required: false, default: "", trim: true },
       concept: { type: String, required: false, default: "", trim: true },
       sire: { type: String, required: false, default: "", trim: true },
       chronicleId: { type: Schema.Types.ObjectId, ref: "Chronicle", required: true },
-      clanKey: { type: String, required: true, default: "" },
+      clanKey: { type: String, required: false, default: "" },
       generation: { type: Number, required: true, default: 13, min: 8, max: 14 },
-      sectKey: { type: String, required: true, default: "" },
-      natureKey: { type: String, required: true, default: "" },
-      demeanorKey: { type: String, required: true, default: "" }
+      sectKey: { type: String, required: false, default: "" },
+      natureKey: { type: String, required: false, default: "" },
+      demeanorKey: { type: String, required: false, default: "" }
     },
 
     creation: {
@@ -100,8 +100,8 @@ const CharacterSchema = new Schema(
 
     resources: { type: ResourcesSchema, required: true },
 
-    notes: { type: String, required: true, default: "" },
-    equipment: { type: String, required: true, default: "" }
+    notes: { type: String, required: false, default: "" },
+    equipment: { type: String, required: false, default: "" }
   },
   { timestamps: true }
 );

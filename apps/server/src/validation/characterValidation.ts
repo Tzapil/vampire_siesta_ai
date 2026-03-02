@@ -17,7 +17,7 @@
 export type ValidationError = { path: string; message: string };
 export type ValidationOptions = { mutate?: boolean };
 
-export const WIZARD_STEPS = 9;
+export const WIZARD_STEPS = 8;
 
 export const ATTR_BUDGET = { primary: 7, secondary: 5, tertiary: 3 } as const;
 export const ABIL_BUDGET = { primary: 13, secondary: 9, tertiary: 5 } as const;
@@ -155,11 +155,16 @@ function ensureUnique(values: string[]) {
   return true;
 }
 
-export function validateRanges(character: any, dict: Dictionaries): ValidationError[] {
+export function validateRanges(
+  character: any,
+  dict: Dictionaries,
+  options: { allowNonClanDisciplines?: boolean } = {}
+): ValidationError[] {
   const errors: ValidationError[] = [];
   const clan = dict.clans.get(character.meta?.clanKey ?? "");
   const fixedAppearance = clan?.rules?.appearanceFixedTo === 0;
   const allowedDisciplines = new Set<string>(clan?.disciplineKeys ?? []);
+  const allowNonClanDisciplines = options.allowNonClanDisciplines === true;
 
   for (const attr of dict.attributes) {
     const layer = getLayer(character.traits?.attributes, attr.key);
@@ -186,7 +191,7 @@ export function validateRanges(character: any, dict: Dictionaries): ValidationEr
     const layer = getLayer(character.traits?.disciplines, discipline.key);
     const total = sumLayered(layer);
     rangeCheck(errors, `traits.disciplines.${discipline.key}`, total, 0, 5, "Дисциплина");
-    if (total !== 0 && !allowedDisciplines.has(discipline.key)) {
+    if (!allowNonClanDisciplines && total !== 0 && !allowedDisciplines.has(discipline.key)) {
       errors.push({
         path: `traits.disciplines.${discipline.key}`,
         message: "Неклановая дисциплина запрещена"
@@ -264,12 +269,14 @@ export function applyClanRules(character: any, dict: Dictionaries, mode: "wizard
   let changed = false;
   const allowed = new Set<string>(clan.disciplineKeys ?? []);
 
-  for (const discipline of dict.disciplines) {
-    if (!allowed.has(discipline.key)) {
-      const current = getLayer(character.traits?.disciplines, discipline.key);
-      if (sumLayered(current) !== 0) {
-        setLayer(character.traits.disciplines, discipline.key, { base: 0, freebie: 0, storyteller: 0 });
-        changed = true;
+  if (mode === "wizard") {
+    for (const discipline of dict.disciplines) {
+      if (!allowed.has(discipline.key)) {
+        const current = getLayer(character.traits?.disciplines, discipline.key);
+        if (sumLayered(current) !== 0) {
+          setLayer(character.traits.disciplines, discipline.key, { base: 0, freebie: 0, storyteller: 0 });
+          changed = true;
+        }
       }
     }
   }
@@ -673,15 +680,21 @@ export function validateStep8(character: any, dict: Dictionaries, options: Valid
   return errors;
 }
 
-export function getStepForPath(path: string) {
+export function getStepForPath(path: string, currentStep?: number) {
   if (path.startsWith("meta.")) return 1;
-  if (path.startsWith("creation.attributesPriority") || path.startsWith("traits.attributes")) return 2;
-  if (path.startsWith("creation.abilitiesPriority") || path.startsWith("traits.abilities")) return 3;
+  if (path.includes(".freebie") || path.startsWith("creation.freebieBuys")) return 8;
+  if (path.startsWith("traits.merits") || path.startsWith("traits.flaws")) {
+    return currentStep && currentStep >= 8 ? 8 : 7;
+  }
+  if (path.startsWith("creation.attributesPriority") || (path.startsWith("traits.attributes") && path.endsWith(".base"))) {
+    return 2;
+  }
+  if (path.startsWith("creation.abilitiesPriority") || (path.startsWith("traits.abilities") && path.endsWith(".base"))) {
+    return 3;
+  }
   if (path.startsWith("traits.disciplines") && path.endsWith(".base")) return 4;
   if (path.startsWith("traits.backgrounds") && path.endsWith(".base")) return 5;
   if (path.startsWith("traits.virtues") && path.endsWith(".base")) return 6;
-  if (path.startsWith("traits.merits") || path.startsWith("traits.flaws")) return 7;
-  if (path.includes(".freebie") || path.startsWith("creation.freebieBuys")) return 8;
   return null;
 }
 
@@ -703,6 +716,7 @@ export function isPatchAllowed(path: string, creationFinished: boolean) {
     /^equipment$/,
     /^traits\.(attributes|abilities|disciplines|backgrounds|virtues)\.[^.]+\.storyteller$/,
     /^meta\.clanKey$/,
+    /^meta\.chronicleId$/,
     /^meta\.generation$/
   ];
 
