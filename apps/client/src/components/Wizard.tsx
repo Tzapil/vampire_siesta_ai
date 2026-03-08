@@ -17,7 +17,7 @@ const STEP_TITLES = [
   "Атрибуты",
   "Способности",
   "Дисциплины",
-  "Фоны",
+  "Детали биографии",
   "Добродетели",
   "Достоинства / Недостатки",
   "Свободные очки"
@@ -1078,7 +1078,7 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
     const remaining = Math.max(0, BACKGROUND_BUDGET - baseSum);
     return (
       <div className="card">
-        <StepHeader title="Фоны" />
+        <StepHeader title="Детали биографии" />
         <div className="step-counter">
           Базовые точки: {baseSum} из {BACKGROUND_BUDGET}, осталось {remaining}
         </div>
@@ -1092,7 +1092,7 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
         <div className="wizard-attr-grid">
           <div className="wizard-attr-card">
             <div className="wizard-attr-card-header">
-              <span>Фоны</span>
+              <span>Детали биографии</span>
               <span className="wizard-attr-priority">Базовые</span>
             </div>
             <div className="wizard-attr-list">
@@ -1557,7 +1557,7 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
 
             <div className="wizard-attr-card">
               <div className="wizard-attr-card-header">
-                <span>Фоны (цена: {FREEBIE_COST.background})</span>
+                <span>Детали биографии (цена: {FREEBIE_COST.background})</span>
               </div>
               <div className="wizard-attr-list">
                 {dictionaries.backgrounds.map((bg) => {

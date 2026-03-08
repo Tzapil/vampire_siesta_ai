@@ -56,6 +56,14 @@ export type ChronicleLogDto = {
   createdAt: string;
 };
 
+export type ChronicleImageDto = {
+  _id: string;
+  chronicleId: string;
+  dataUrl: string;
+  name?: string;
+  createdAt: string;
+};
+
 export type CharacterSummaryDto = {
   uuid: string;
   creationFinished: boolean;

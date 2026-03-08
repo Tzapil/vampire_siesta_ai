@@ -401,7 +401,7 @@ export default function StorytellerPage() {
 
           <div className="wizard-attr-card">
             <div className="wizard-attr-card-header">
-              <span>Фоны</span>
+              <span>Детали биографии</span>
             </div>
             <div className="wizard-attr-list">
               {buildEntries.backgrounds.map((entry) => {

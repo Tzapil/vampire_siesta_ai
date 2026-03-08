@@ -1,45 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
-import type { CharacterDto, ChronicleLogDto, DictItem, LayeredValue } from "../api/types";
+import type {
+  CharacterDto,
+  ChronicleDto,
+  ChronicleLogDto,
+  DictItem,
+  LayeredValue
+} from "../api/types";
 import { useDictionaries } from "../context/DictionariesContext";
 import { useToast } from "../context/ToastContext";
 import { HealthTrack } from "./HealthTrack";
-
-function NumericControl({
-  label,
-  value,
-  min,
-  max,
-  onChange
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  onChange: (next: number) => void;
-}) {
-  return (
-    <div className="field">
-      <label>{label}</label>
-      <div className="page-actions">
-        <button type="button" onClick={() => onChange(Math.max(value - 1, min))}>
-          -
-        </button>
-        <input
-          type="number"
-          min={min}
-          max={max}
-          value={value}
-          onChange={(event) => onChange(Number(event.target.value))}
-        />
-        <button type="button" onClick={() => onChange(Math.min(value + 1, max))}>
-          +
-        </button>
-        <span>/ {max}</span>
-      </div>
-    </div>
-  );
-}
+import { Link } from "react-router-dom";
 
 function HealthAdjustButton({
   label,
@@ -121,6 +92,7 @@ export function GameMode({
 
   const [diceDifficulty, setDiceDifficulty] = useState(6);
   const [diceCount, setDiceCount] = useState(6);
+  const [chronicle, setChronicle] = useState<ChronicleDto | null>(null);
   const [chronicleLogs, setChronicleLogs] = useState<ChronicleLogDto[]>([]);
   const [logOpen, setLogOpen] = useState(true);
   const [rollResult, setRollResult] = useState<{
@@ -130,6 +102,35 @@ export function GameMode({
     net: number;
     status: "success" | "failure" | "botch";
   } | null>(null);
+  const [initiativeResult, setInitiativeResult] = useState<number | null>(null);
+
+  const handleRollInitiative = () => {
+    const dexterity = totalFor(character.traits.attributes["dexterity"]);
+    const wits = totalFor(character.traits.attributes["wits"]);
+    const base = dexterity + wits;
+    const roll = 1 + Math.floor(Math.random() * 10);
+    const total = base + roll;
+    setInitiativeResult(total);
+
+    const characterName = character.meta.name?.trim() || "(Без имени)";
+    const playerName = character.meta.playerName?.trim() || "Неизвестный игрок";
+    const message = `Игрок ${playerName}, персонаж ${characterName}, бросил инициативу: Ловкость ${dexterity} + Смекалка ${wits} + d10(${roll}) = ${total}.`;
+
+    logChronicleEvent({
+      type: "initiative_roll",
+      message,
+      data: {
+        playerName,
+        characterName,
+        characterUuid: character.uuid,
+        dexterity,
+        wits,
+        base,
+        roll,
+        total
+      }
+    });
+  };
 
   useEffect(() => {
     const chronicleId = character.meta.chronicleId;
@@ -142,13 +143,37 @@ export function GameMode({
       try {
         const logs = await api.get<ChronicleLogDto[]>(`/chronicles/${chronicleId}/logs?limit=50`);
         if (active) {
-          setChronicleLogs(logs);
+          const sorted = [...logs].sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+          setChronicleLogs(sorted);
         }
       } catch {
         if (active) setChronicleLogs([]);
       }
     }
     loadLogs();
+    return () => {
+      active = false;
+    };
+  }, [character.meta.chronicleId]);
+
+  useEffect(() => {
+    const chronicleId = character.meta.chronicleId;
+    if (!chronicleId) {
+      setChronicle(null);
+      return;
+    }
+    let active = true;
+    api
+      .get<ChronicleDto>(`/chronicles/${chronicleId}`)
+      .then((data) => {
+        if (active) setChronicle(data);
+      })
+      .catch(() => {
+        if (active) setChronicle(null);
+      });
     return () => {
       active = false;
     };
@@ -175,41 +200,31 @@ export function GameMode({
     const result = { values, successes, ones, net, status };
     setRollResult(result);
 
-    const chronicleId = character.meta.chronicleId;
-    if (chronicleId) {
-      const characterName = character.meta.name?.trim() || "(Без имени)";
-      const playerName = character.meta.playerName?.trim() || "Неизвестный игрок";
-      const statusLabel =
-        status === "success" ? "успех" : status === "botch" ? "критический провал" : "провал";
-      const message = `Игрок ${playerName}, персонаж ${characterName}, бросил проверку сложности ${difficulty} на ${count} куб(ов): ${statusLabel}, успехов ${Math.max(
-        net,
-        0
-      )}.`;
+    const characterName = character.meta.name?.trim() || "(Без имени)";
+    const playerName = character.meta.playerName?.trim() || "Неизвестный игрок";
+    const statusLabel =
+      status === "success" ? "успех" : status === "botch" ? "критический провал" : "провал";
+    const message = `Игрок ${playerName}, персонаж ${characterName}, бросил проверку сложности ${difficulty} на ${count} куб(ов): ${statusLabel}, успехов ${Math.max(
+      net,
+      0
+    )}.`;
 
-      api
-        .post<ChronicleLogDto>(`/chronicles/${chronicleId}/logs`, {
-          type: "dice_roll",
-          message,
-          data: {
-            playerName,
-            characterName,
-            characterUuid: character.uuid,
-            difficulty,
-            diceCount: count,
-            values,
-            successes,
-            ones,
-            net,
-            status
-          }
-        })
-        .then((entry) => {
-          setChronicleLogs((prev) => [entry, ...prev].slice(0, 50));
-        })
-        .catch(() => {
-          pushToast("Не удалось записать бросок в лог", "error");
-        });
-    }
+    logChronicleEvent({
+      type: "dice_roll",
+      message,
+      data: {
+        playerName,
+        characterName,
+        characterUuid: character.uuid,
+        difficulty,
+        diceCount: count,
+        values,
+        successes,
+        ones,
+        net,
+        status
+      }
+    });
   };
 
   const handleAvatarFile = async (file?: File | null) => {
@@ -232,6 +247,217 @@ export function GameMode({
       pushToast("Не удалось прочитать файл", "error");
     };
     reader.readAsDataURL(file);
+  };
+
+  const logChronicleEvent = (payload: {
+    type: string;
+    message: string;
+    data?: Record<string, unknown>;
+  }) => {
+    const chronicleId = character.meta.chronicleId;
+    if (!chronicleId) return;
+    api
+      .post<ChronicleLogDto>(`/chronicles/${chronicleId}/logs`, payload)
+      .then((entry) => {
+        setChronicleLogs((prev) => {
+          const next = [entry, ...prev];
+          next.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          return next.slice(0, 50);
+        });
+      })
+      .catch(() => {
+        pushToast("Не удалось записать событие в лог", "error");
+      });
+  };
+
+  const handleHealthChange = (next: { bashing: number; lethal: number; aggravated: number }) => {
+    const prev = health;
+    if (
+      prev.bashing === next.bashing &&
+      prev.lethal === next.lethal &&
+      prev.aggravated === next.aggravated
+    ) {
+      return;
+    }
+    onPatch("resources.health", next);
+
+    const characterName = character.meta.name?.trim() || "(Без имени)";
+    const playerName = character.meta.playerName?.trim() || "Неизвестный игрок";
+    const typeLabels: Record<string, string> = {
+      bashing: "ударный",
+      lethal: "летальный",
+      aggravated: "агравированный"
+    };
+
+    const deltas = {
+      bashing: next.bashing - prev.bashing,
+      lethal: next.lethal - prev.lethal,
+      aggravated: next.aggravated - prev.aggravated
+    };
+
+    (Object.keys(deltas) as Array<keyof typeof deltas>).forEach((key) => {
+      const delta = deltas[key];
+      if (delta === 0) return;
+      const kind = delta > 0 ? "damage" : "heal";
+      const amount = Math.abs(delta);
+      const typeLabel = typeLabels[key] ?? key;
+      const actionLabel = kind === "damage" ? "получил урон" : "вылечил урон";
+      const message = `Игрок ${playerName}, персонаж ${characterName}, ${actionLabel} типа ${typeLabel}: ${amount}.`;
+      logChronicleEvent({
+        type: "health_change",
+        message,
+        data: {
+          playerName,
+          characterName,
+          characterUuid: character.uuid,
+          kind,
+          damageType: key,
+          amount
+        }
+      });
+    });
+  };
+
+  const handleResourceChange = (
+    resourceKey: "bloodPool" | "willpower" | "humanity",
+    nextValue: number
+  ) => {
+    const prevValue = resources[resourceKey].current;
+    if (prevValue === nextValue) return;
+    onPatch(`resources.${resourceKey}.current`, nextValue);
+
+    const characterName = character.meta.name?.trim() || "(Без имени)";
+    const playerName = character.meta.playerName?.trim() || "Неизвестный игрок";
+    const labels: Record<typeof resourceKey, string> = {
+      bloodPool: "Кровь",
+      willpower: "Сила воли",
+      humanity: "Человечность"
+    };
+    const delta = nextValue - prevValue;
+    const kind = delta > 0 ? "increase" : "decrease";
+    const amount = Math.abs(delta);
+    const actionLabel = kind === "increase" ? "увеличил" : "уменьшил";
+    const resourceLabel = labels[resourceKey];
+    const message = `Игрок ${playerName}, персонаж ${characterName}, ${actionLabel} ${resourceLabel} на ${amount} (теперь ${nextValue}).`;
+    logChronicleEvent({
+      type: "resource_change",
+      message,
+      data: {
+        playerName,
+        characterName,
+        characterUuid: character.uuid,
+        resourceKey,
+        kind,
+        amount,
+        from: prevValue,
+        to: nextValue
+      }
+    });
+  };
+
+  const adjustResource = (
+    resourceKey: "bloodPool" | "willpower" | "humanity",
+    delta: number,
+    min: number,
+    max: number
+  ) => {
+    const next = clampNumber(resources[resourceKey].current + delta, min, max);
+    handleResourceChange(resourceKey, next);
+  };
+
+  const renderLogMessage = (log: ChronicleLogDto) => {
+    if (log.type === "dice_roll" && log.data) {
+      const data = log.data as Record<string, unknown>;
+      const playerName = String(data.playerName ?? "Неизвестный игрок");
+      const characterName = String(data.characterName ?? "Без имени");
+      const difficulty = Number(data.difficulty ?? 0);
+      const diceCount = Number(data.diceCount ?? 0);
+      const status = String(data.status ?? "failure") as
+        | "success"
+        | "failure"
+        | "botch";
+      const net = Number(data.net ?? 0);
+      const statusLabel =
+        status === "success" ? "успех" : status === "botch" ? "критический провал" : "провал";
+      const successCount = Math.max(net, 0);
+      return (
+        <span className="log-text">
+          Игрок <strong>{playerName}</strong>, персонаж <strong>{characterName}</strong>, бросил
+          проверку сложности {difficulty} на {diceCount} куб(ов):{" "}
+          <span className={`log-status ${status}`}>{statusLabel}</span>, успехов{" "}
+          <span className={`log-success-count ${successCount > 0 ? "success" : "failure"}`}>
+            {successCount}
+          </span>
+          .
+        </span>
+      );
+    }
+    if (log.type === "health_change" && log.data) {
+      const data = log.data as Record<string, unknown>;
+      const playerName = String(data.playerName ?? "Неизвестный игрок");
+      const characterName = String(data.characterName ?? "Без имени");
+      const kind = String(data.kind ?? "damage") as "damage" | "heal";
+      const damageType = String(data.damageType ?? "");
+      const amount = Number(data.amount ?? 0);
+      const typeLabels: Record<string, string> = {
+        bashing: "ударный",
+        lethal: "летальный",
+        aggravated: "агравированный"
+      };
+      const typeLabel = typeLabels[damageType] ?? damageType;
+      const actionLabel = kind === "damage" ? "получил урон" : "вылечил урон";
+      return (
+        <span className="log-text">
+          Игрок <strong>{playerName}</strong>, персонаж <strong>{characterName}</strong>,{" "}
+          <span className={`log-status ${kind}`}>
+            {actionLabel}
+          </span>{" "}
+          типа {typeLabel}:{" "}
+          <span className={`log-amount ${kind}`}>{amount}</span>
+          .
+        </span>
+      );
+    }
+    if (log.type === "resource_change" && log.data) {
+      const data = log.data as Record<string, unknown>;
+      const playerName = String(data.playerName ?? "Неизвестный игрок");
+      const characterName = String(data.characterName ?? "Без имени");
+      const resourceKey = String(data.resourceKey ?? "");
+      const kind = String(data.kind ?? "increase") as "increase" | "decrease";
+      const amount = Number(data.amount ?? 0);
+      const toValue = Number(data.to ?? 0);
+      const labels: Record<string, string> = {
+        bloodPool: "Кровь",
+        willpower: "Сила воли",
+        humanity: "Человечность"
+      };
+      const resourceLabel = labels[resourceKey] ?? resourceKey;
+      const actionLabel = kind === "increase" ? "увеличил" : "уменьшил";
+      return (
+        <span className="log-text">
+          Игрок <strong>{playerName}</strong>, персонаж <strong>{characterName}</strong>,{" "}
+          <span className={`log-status ${kind}`}>{actionLabel}</span> {resourceLabel} на{" "}
+          <span className={`log-amount ${kind}`}>{amount}</span> (теперь {toValue}).
+        </span>
+      );
+    }
+    if (log.type === "initiative_roll" && log.data) {
+      const data = log.data as Record<string, unknown>;
+      const playerName = String(data.playerName ?? "Неизвестный игрок");
+      const characterName = String(data.characterName ?? "Без имени");
+      const dexterity = Number(data.dexterity ?? 0);
+      const wits = Number(data.wits ?? 0);
+      const roll = Number(data.roll ?? 0);
+      const total = Number(data.total ?? dexterity + wits + roll);
+      return (
+        <span className="log-text">
+          Игрок <strong>{playerName}</strong>, персонаж <strong>{characterName}</strong>, бросил
+          инициативу: Ловкость {dexterity} + Смекалка {wits} + d10({roll}) ={" "}
+          <span className="log-success-count success">{total}</span>.
+        </span>
+      );
+    }
+    return <span className="log-text">{log.message}</span>;
   };
 
   const renderTraitList = (
@@ -271,6 +497,7 @@ export function GameMode({
     dictionaries.natures.find((item) => item.key === character.meta.natureKey)?.labelRu || "—";
   const demeanorLabel =
     dictionaries.demeanors.find((item) => item.key === character.meta.demeanorKey)?.labelRu || "—";
+  const chronicleName = chronicle?.name?.trim() || "—";
 
   const clampHealth = (next: { bashing: number; lethal: number; aggravated: number }) => {
     const bashing = Math.max(0, Math.min(7, next.bashing));
@@ -293,11 +520,11 @@ export function GameMode({
       ...health,
       [field]: health[field] + delta
     } as { bashing: number; lethal: number; aggravated: number };
-    onPatch("resources.health", clampHealth(next));
+    handleHealthChange(clampHealth(next));
   };
 
   const healAll = () => {
-    onPatch("resources.health", { bashing: 0, lethal: 0, aggravated: 0 });
+    handleHealthChange({ bashing: 0, lethal: 0, aggravated: 0 });
   };
 
   return (
@@ -347,6 +574,16 @@ export function GameMode({
               </div>
               <div className="sheet-meta">
                 <span>Игрок: {character.meta.playerName || "—"}</span>
+                <span>
+                  Хроника:{" "}
+                  {character.meta.chronicleId ? (
+                    <Link className="inline-link" to={`/chronicles/${character.meta.chronicleId}`}>
+                      {chronicleName}
+                    </Link>
+                  ) : (
+                    "—"
+                  )}
+                </span>
                 <span>Натура: {natureLabel}</span>
                 <span>Поведение: {demeanorLabel}</span>
               </div>
@@ -356,33 +593,106 @@ export function GameMode({
         <div className="sheet-header-right">
           <div className="sheet-stats">
             <div className="stat-pill">
-              <span className="stat-label">Кровь</span>
+              <span className="stat-icon" title="Кровь" aria-label="Кровь" role="img">
+                🩸
+              </span>
               <span className="stat-value">
                 {resources.bloodPool.current}
                 <span className="stat-max">/{maxBlood}</span>
               </span>
+              <div className="stat-controls">
+                <button
+                  type="button"
+                  className="stat-btn"
+                  aria-label="Убавить кровь"
+                  title="Убавить кровь"
+                  onClick={() => adjustResource("bloodPool", -1, 0, maxBlood)}
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  className="stat-btn"
+                  aria-label="Добавить кровь"
+                  title="Добавить кровь"
+                  onClick={() => adjustResource("bloodPool", 1, 0, maxBlood)}
+                >
+                  +
+                </button>
+              </div>
             </div>
             <div className="stat-pill">
-              <span className="stat-label">Сила воли</span>
+              <span className="stat-icon" title="Сила воли" aria-label="Сила воли" role="img">
+                🧠
+              </span>
               <span className="stat-value">
                 {resources.willpower.current}
                 <span className="stat-max">/10</span>
               </span>
+              <div className="stat-controls">
+                <button
+                  type="button"
+                  className="stat-btn"
+                  aria-label="Убавить силу воли"
+                  title="Убавить силу воли"
+                  onClick={() => adjustResource("willpower", -1, 0, 10)}
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  className="stat-btn"
+                  aria-label="Добавить силу воли"
+                  title="Добавить силу воли"
+                  onClick={() => adjustResource("willpower", 1, 0, 10)}
+                >
+                  +
+                </button>
+              </div>
             </div>
             <div className="stat-pill">
-              <span className="stat-label">Человечность</span>
+              <span
+                className="stat-icon"
+                title="Человечность"
+                aria-label="Человечность"
+                role="img"
+              >
+                😇
+              </span>
               <span className="stat-value">
                 {resources.humanity.current}
                 <span className="stat-max">/10</span>
               </span>
+              <div className="stat-controls">
+                <button
+                  type="button"
+                  className="stat-btn"
+                  aria-label="Убавить человечность"
+                  title="Убавить человечность"
+                  onClick={() => adjustResource("humanity", -1, 0, 10)}
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  className="stat-btn"
+                  aria-label="Добавить человечность"
+                  title="Добавить человечность"
+                  onClick={() => adjustResource("humanity", 1, 0, 10)}
+                >
+                  +
+                </button>
+              </div>
             </div>
             <div className="stat-pill">
-              <span className="stat-label">Здоровье</span>
+              <span className="stat-icon" title="Здоровье" aria-label="Здоровье" role="img">
+                ❤️
+              </span>
               <span className="stat-value">
                 {totalDamage}
                 <span className="stat-max">/7</span>
               </span>
-              <span className="stat-mini">
+              <span className="stat-detail">
                 👊 {health.bashing} · 🔪 {health.lethal} · 🐾 {health.aggravated}
               </span>
             </div>
@@ -409,7 +719,7 @@ export function GameMode({
               true,
               { hideZero: true }
             )}
-            {renderTraitList("Фоны", dictionaries.backgrounds, character.traits.backgrounds, true)}
+            {renderTraitList("Детали биографии", dictionaries.backgrounds, character.traits.backgrounds, true)}
             {renderTraitList("Добродетели", dictionaries.virtues, character.traits.virtues, true)}
           </div>
           <div className="sheet-card">
@@ -459,100 +769,102 @@ export function GameMode({
           <div className="sheet-card">
             <div className="sheet-card-header">Бросок кубиков</div>
             <div className="dice-roller">
-              <div className="dice-inputs">
-                <label className="dice-field">
-                  <span>Сложность</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={diceDifficulty}
-                    onChange={(event) =>
-                      setDiceDifficulty(
-                        clampNumber(Number(event.target.value || 0), 1, 10)
-                      )
-                    }
-                  />
-                </label>
-                <label className="dice-field">
-                  <span>Кубиков</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={20}
-                    value={diceCount}
-                    onChange={(event) =>
-                      setDiceCount(clampNumber(Number(event.target.value || 0), 1, 20))
-                    }
-                  />
-                </label>
-                <button type="button" className="primary" onClick={handleRollDice}>
+              <div className="dice-panel">
+                <div className="dice-title">
+                  <span className="dice-icon" aria-hidden="true">
+                    🎲
+                  </span>
+                  Бросок кубиков
+                </div>
+                <div className="dice-controls">
+                  <label className="dice-field">
+                    <span>Сложность</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={diceDifficulty}
+                      onChange={(event) =>
+                        setDiceDifficulty(
+                          clampNumber(Number(event.target.value || 0), 1, 10)
+                        )
+                      }
+                    />
+                  </label>
+                  <label className="dice-field">
+                    <span>Кубиков</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={diceCount}
+                      onChange={(event) =>
+                        setDiceCount(clampNumber(Number(event.target.value || 0), 1, 20))
+                      }
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="icon-button dice-roll-button"
+                    onClick={handleRollDice}
+                    title="Бросить"
+                    aria-label="Бросить"
+                  >
+                    🎲
+                  </button>
+                </div>
+                {rollResult && (
+                  <div className={`dice-result ${rollResult.status}`}>
+                    <div className="dice-values">
+                      {rollResult.values.map((value, index) => {
+                        const isSuccess = value >= diceDifficulty;
+                        const isOne = value === 1;
+                        return (
+                          <span
+                            key={`${value}-${index}`}
+                            className={`dice-die ${isSuccess ? "success" : "fail"} ${
+                              isOne ? "one" : ""
+                            }`}
+                          >
+                            {value}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <div className="dice-summary">
+                      <span>Успехи: {Math.max(0, rollResult.net)}</span>
+                      <span>Единицы: {rollResult.ones}</span>
+                      <span className="dice-status">
+                        {rollResult.status === "success"
+                          ? "Успех"
+                          : rollResult.status === "botch"
+                            ? "Критический провал"
+                            : "Провал"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="initiative-panel">
+                <div className="initiative-title">
+                  <span className="initiative-icon" aria-hidden="true">
+                    ⚡
+                  </span>
+                  Инициатива
+                </div>
+                <button type="button" className="initiative-button" onClick={handleRollInitiative}>
                   Бросить
                 </button>
-              </div>
-              {rollResult && (
-                <div className={`dice-result ${rollResult.status}`}>
-                  <div className="dice-values">
-                    {rollResult.values.map((value, index) => {
-                      const isSuccess = value >= diceDifficulty;
-                      const isOne = value === 1;
-                      return (
-                        <span
-                          key={`${value}-${index}`}
-                          className={`dice-die ${isSuccess ? "success" : "fail"} ${
-                            isOne ? "one" : ""
-                          }`}
-                        >
-                          {value}
-                        </span>
-                      );
-                    })}
-                  </div>
-                  <div className="dice-summary">
-                    <span>Успехи: {Math.max(0, rollResult.net)}</span>
-                    <span>Единицы: {rollResult.ones}</span>
-                    <span className="dice-status">
-                      {rollResult.status === "success"
-                        ? "Успех"
-                        : rollResult.status === "botch"
-                          ? "Критический провал"
-                          : "Провал"}
-                    </span>
-                  </div>
+                <div className="initiative-value">
+                  {initiativeResult === null ? "—" : initiativeResult}
                 </div>
-              )}
+                <div className="initiative-formula">Ловкость + Смекалка + d10</div>
+              </div>
             </div>
           </div>
-          <div className="sheet-card compact-controls">
-            <div className="sheet-card-header">Ресурсы</div>
-            <div className="compact-controls-grid">
-              <NumericControl
-                label="Кровь"
-                value={resources.bloodPool.current}
-                min={0}
-                max={maxBlood}
-                onChange={(next) => onPatch("resources.bloodPool.current", next)}
-              />
-              <NumericControl
-                label="Сила воли"
-                value={resources.willpower.current}
-                min={0}
-                max={10}
-                onChange={(next) => onPatch("resources.willpower.current", next)}
-              />
-              <NumericControl
-                label="Человечность"
-                value={resources.humanity.current}
-                min={0}
-                max={10}
-                onChange={(next) => onPatch("resources.humanity.current", next)}
-              />
-            </div>
-          </div>
-
           <div className="sheet-card compact-health">
             <div className="sheet-card-header">Здоровье</div>
-            <HealthTrack health={health} onChange={(next) => onPatch("resources.health", next)} />
+            <HealthTrack health={health} onChange={handleHealthChange} />
             <div className="page-actions health-actions compact">
               <HealthAdjustButton
                 label="🧪"
@@ -642,7 +954,7 @@ export function GameMode({
                   <div className="log-time">
                     {new Date(log.createdAt).toLocaleString("ru-RU")}
                   </div>
-                  <div className="log-message">{log.message}</div>
+                  <div className="log-message">{renderLogMessage(log)}</div>
                 </div>
               ))}
             </div>
