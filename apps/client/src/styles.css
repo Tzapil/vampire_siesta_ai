@@ -550,6 +550,10 @@ button:disabled {
   background: #0c1524;
 }
 
+.dice-panel.is-rolling {
+  animation: panelPulse 0.6s ease;
+}
+
 .dice-title {
   display: inline-flex;
   align-items: center;
@@ -574,6 +578,10 @@ button:disabled {
   border-radius: 12px;
   border: 1px solid #22324d;
   background: #0c1524;
+}
+
+.initiative-panel.is-rolling {
+  animation: panelPulse 0.6s ease;
 }
 
 .initiative-title {
@@ -616,6 +624,10 @@ button:disabled {
   background: rgba(43, 107, 255, 0.12);
   min-width: 56px;
   text-align: center;
+}
+
+.initiative-value.is-rolling {
+  animation: valueFlash 0.6s ease;
 }
 
 .initiative-formula {
@@ -680,6 +692,10 @@ button:disabled {
   font-weight: 700;
   font-size: 12px;
   color: #c7d7f1;
+}
+
+.dice-result.is-rolling .dice-die {
+  animation: diePop 0.5s ease both;
 }
 
 .dice-die.success {
@@ -1449,5 +1465,49 @@ button:disabled {
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
+  }
+}
+
+@keyframes panelPulse {
+  0% {
+    transform: translateY(0);
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+  }
+  40% {
+    transform: translateY(-1px);
+    box-shadow: 0 0 12px rgba(43, 107, 255, 0.25);
+  }
+  100% {
+    transform: translateY(0);
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+  }
+}
+
+@keyframes diePop {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+  60% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes valueFlash {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 0 12px rgba(43, 107, 255, 0.45);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0);
   }
 }

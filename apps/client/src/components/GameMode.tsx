@@ -65,6 +65,8 @@ export function GameMode({
   const { pushToast } = useToast();
   const maxBlood = character.derived?.bloodPoolMax ?? 0;
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const diceAnimTimeoutRef = useRef<number | null>(null);
+  const initiativeAnimTimeoutRef = useRef<number | null>(null);
   const avatarUrl = character.meta.avatarUrl?.trim();
 
   const resources = character.resources;
@@ -103,10 +105,19 @@ export function GameMode({
     status: "success" | "failure" | "botch";
   } | null>(null);
   const [initiativeResult, setInitiativeResult] = useState<number | null>(null);
+  const [diceRolling, setDiceRolling] = useState(false);
+  const [initiativeRolling, setInitiativeRolling] = useState(false);
   const [selectedAttributeKey, setSelectedAttributeKey] = useState<string | null>(null);
   const [selectedAbilityKey, setSelectedAbilityKey] = useState<string | null>(null);
 
   const handleRollInitiative = () => {
+    if (initiativeAnimTimeoutRef.current) {
+      window.clearTimeout(initiativeAnimTimeoutRef.current);
+    }
+    setInitiativeRolling(false);
+    requestAnimationFrame(() => setInitiativeRolling(true));
+    initiativeAnimTimeoutRef.current = window.setTimeout(() => setInitiativeRolling(false), 600);
+
     const dexterity = totalFor(character.traits.attributes["dexterity"]);
     const wits = totalFor(character.traits.attributes["wits"]);
     const base = dexterity + wits;
@@ -162,6 +173,17 @@ export function GameMode({
   }, [character.meta.chronicleId]);
 
   useEffect(() => {
+    return () => {
+      if (diceAnimTimeoutRef.current) {
+        window.clearTimeout(diceAnimTimeoutRef.current);
+      }
+      if (initiativeAnimTimeoutRef.current) {
+        window.clearTimeout(initiativeAnimTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     const chronicleId = character.meta.chronicleId;
     if (!chronicleId) {
       setChronicle(null);
@@ -182,6 +204,17 @@ export function GameMode({
   }, [character.meta.chronicleId]);
 
   useEffect(() => {
+    return () => {
+      if (diceAnimTimeoutRef.current) {
+        window.clearTimeout(diceAnimTimeoutRef.current);
+      }
+      if (initiativeAnimTimeoutRef.current) {
+        window.clearTimeout(initiativeAnimTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!selectedAttributeKey || !selectedAbilityKey) return;
     const attrTotal = totalFor(character.traits.attributes[selectedAttributeKey]);
     const abilityTotal = totalFor(character.traits.abilities[selectedAbilityKey]);
@@ -195,6 +228,13 @@ export function GameMode({
   ]);
 
   const handleRollDice = () => {
+    if (diceAnimTimeoutRef.current) {
+      window.clearTimeout(diceAnimTimeoutRef.current);
+    }
+    setDiceRolling(false);
+    requestAnimationFrame(() => setDiceRolling(true));
+    diceAnimTimeoutRef.current = window.setTimeout(() => setDiceRolling(false), 600);
+
     const difficulty = clampNumber(diceDifficulty, 1, 10);
     const count = clampNumber(diceCount, 1, 20);
     setDiceDifficulty(difficulty);
@@ -829,7 +869,7 @@ export function GameMode({
           <div className="sheet-card">
             <div className="sheet-card-header">Бросок кубиков</div>
             <div className="dice-roller">
-              <div className="dice-panel">
+              <div className={`dice-panel ${diceRolling ? "is-rolling" : ""}`}>
                 <div className="dice-title">
                   <span className="dice-icon" aria-hidden="true">
                     🎲
@@ -884,7 +924,7 @@ export function GameMode({
                   )}
                 </div>
                 {rollResult && (
-                  <div className={`dice-result ${rollResult.status}`}>
+                  <div className={`dice-result ${rollResult.status} ${diceRolling ? "is-rolling" : ""}`}>
                     <div className="dice-values">
                       {rollResult.values.map((value, index) => {
                         const isSuccess = value >= diceDifficulty;
@@ -895,6 +935,11 @@ export function GameMode({
                             className={`dice-die ${isSuccess ? "success" : "fail"} ${
                               isOne ? "one" : ""
                             }`}
+                            style={
+                              diceRolling
+                                ? { animationDelay: `${index * 40}ms` }
+                                : undefined
+                            }
                           >
                             {value}
                           </span>
@@ -915,7 +960,7 @@ export function GameMode({
                   </div>
                 )}
               </div>
-              <div className="initiative-panel">
+              <div className={`initiative-panel ${initiativeRolling ? "is-rolling" : ""}`}>
                 <div className="initiative-title">
                   <span className="initiative-icon" aria-hidden="true">
                     ⚡
@@ -925,7 +970,7 @@ export function GameMode({
                 <button type="button" className="initiative-button" onClick={handleRollInitiative}>
                   Бросить
                 </button>
-                <div className="initiative-value">
+                <div className={`initiative-value ${initiativeRolling ? "is-rolling" : ""}`}>
                   {initiativeResult === null ? "—" : initiativeResult}
                 </div>
                 <div className="initiative-formula">Ловкость + Смекалка + d10</div>
