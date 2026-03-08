@@ -1,4 +1,5 @@
-﻿export { ChronicleModel } from "./models/Chronicle";
+export { ChronicleModel } from "./models/Chronicle";
+export { ChronicleLogModel } from "./models/ChronicleLog";
 export { GenerationModel } from "./models/Generation";
 export { ClanModel } from "./models/Clan";
 export { AttributeModel } from "./models/Attribute";

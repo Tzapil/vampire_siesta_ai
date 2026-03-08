@@ -54,6 +54,7 @@ const CharacterSchema = new Schema(
       concept: { type: String, required: false, default: "", trim: true },
       sire: { type: String, required: false, default: "", trim: true },
       chronicleId: { type: Schema.Types.ObjectId, ref: "Chronicle", required: true },
+      avatarUrl: { type: String, required: false, default: "", trim: true },
       clanKey: { type: String, required: false, default: "" },
       generation: { type: Number, required: true, default: 13, min: 8, max: 14 },
       sectKey: { type: String, required: false, default: "" },

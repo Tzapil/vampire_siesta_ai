@@ -1,6 +1,9 @@
 ﻿export type DictItem = {
   key: string;
   labelRu: string;
+  description?: string;
+  category?: string;
+  maxValue?: number;
 };
 
 export type ClanDto = DictItem & {
@@ -10,10 +13,16 @@ export type ClanDto = DictItem & {
 
 export type AttributeDto = DictItem & {
   group: "physical" | "social" | "mental";
+  specializationAt?: number;
+  specializationDescription?: string;
+  pageRef?: string;
 };
 
 export type AbilityDto = DictItem & {
   group: "talents" | "skills" | "knowledges";
+  specializationAt?: number;
+  specializationDescription?: string;
+  pageRef?: string;
 };
 
 export type GenerationDto = {
@@ -36,6 +45,15 @@ export type ChronicleDto = {
   _id: string;
   name: string;
   description?: string;
+};
+
+export type ChronicleLogDto = {
+  _id: string;
+  chronicleId: string;
+  type: string;
+  message: string;
+  data?: Record<string, unknown>;
+  createdAt: string;
 };
 
 export type CharacterSummaryDto = {
@@ -63,6 +81,7 @@ export type CharacterDto = {
     concept: string;
     sire: string;
     chronicleId: string;
+    avatarUrl?: string;
     clanKey: string;
     generation: number;
     sectKey: string;

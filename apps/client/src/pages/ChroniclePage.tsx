@@ -1,13 +1,14 @@
 ﻿import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import type { ChronicleDto, CharacterSummaryDto } from "../api/types";
+import type { ChronicleDto, ChronicleLogDto, CharacterSummaryDto } from "../api/types";
 import { useToast } from "../context/ToastContext";
 
 export default function ChroniclePage() {
   const { id } = useParams();
   const [chronicle, setChronicle] = useState<ChronicleDto | null>(null);
   const [characters, setCharacters] = useState<CharacterSummaryDto[]>([]);
+  const [logs, setLogs] = useState<ChronicleLogDto[]>([]);
   const [loading, setLoading] = useState(true);
   const { pushToast } = useToast();
 
@@ -16,13 +17,15 @@ export default function ChroniclePage() {
     let active = true;
     async function load() {
       try {
-        const [chronicleData, charactersData] = await Promise.all([
+        const [chronicleData, charactersData, logsData] = await Promise.all([
           api.get<ChronicleDto>(`/chronicles/${id}`),
-          api.get<CharacterSummaryDto[]>(`/chronicles/${id}/characters`)
+          api.get<CharacterSummaryDto[]>(`/chronicles/${id}/characters`),
+          api.get<ChronicleLogDto[]>(`/chronicles/${id}/logs?limit=50`)
         ]);
         if (!active) return;
         setChronicle(chronicleData);
         setCharacters(charactersData);
+        setLogs(logsData);
       } catch (err: any) {
         pushToast(err?.message ?? "Не удалось загрузить хронику", "error");
       } finally {
@@ -71,6 +74,20 @@ export default function ChroniclePage() {
             );
           })}
           {characters.length === 0 && <p>Пока нет персонажей.</p>}
+        </div>
+      </div>
+      <div className="card">
+        <div className="section-title">Лог хроники</div>
+        <div className="log-list">
+          {logs.length === 0 && <div className="log-empty">Нет событий.</div>}
+          {logs.map((log) => (
+            <div key={log._id} className="log-item">
+              <div className="log-time">
+                {new Date(log.createdAt).toLocaleString("ru-RU")}
+              </div>
+              <div className="log-message">{log.message}</div>
+            </div>
+          ))}
         </div>
       </div>
     </section>

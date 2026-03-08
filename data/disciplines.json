@@ -1,0 +1,61 @@
+{
+  "physical": [
+    { "id": "potence", "name": "Мощь (Potence)", "category": "physical" },
+    { "id": "fortitude", "name": "Стойкость (Fortitude)", "category": "physical" },
+    { "id": "celerity", "name": "Стремительность (Celerity)", "category": "physical" }
+  ],
+  "mental": [
+    { "id": "animalism", "name": "Анимализм (Animalism)", "category": "mental" },
+    { "id": "presence", "name": "Величие (Presence)", "category": "mental" },
+    { "id": "dominate", "name": "Доминирование (Dominate)", "category": "mental" },
+    { "id": "auspex", "name": "Ясновидение (Auspex)", "category": "mental" },
+    { "id": "obfuscate", "name": "Сокрытие (Obfuscate)", "category": "mental" }
+  ],
+  "unique": [
+    { "id": "obtenebration", "name": "Затмение (Obtenebration)", "category": "unique" },
+    { "id": "protean", "name": "Метаморфозы (Protean)", "category": "unique" },
+    {
+      "id": "necromancy",
+      "name": "Некромантия (Necromancy)",
+      "category": "unique",
+      "hasPaths": true,
+      "paths": [
+        "path_sepulchre",
+        "path_cenotaph",
+        "path_bone",
+        "path_corpse",
+        "path_ash",
+        "path_decay",
+        "path_four_humours",
+        "path_entropy"
+      ]
+    },
+    { "id": "dementation", "name": "Помешательство (Dementation)", "category": "unique" },
+    { "id": "vicissitude", "name": "Преображение (Vicissitude)", "category": "unique" },
+    { "id": "serpentis", "name": "Серпентис (Serpentis)", "category": "unique" },
+    {
+      "id": "thaumaturgy",
+      "name": "Тауматургия (Thaumaturgy)",
+      "category": "unique",
+      "hasPaths": true,
+      "paths": [
+        "path_blood",
+        "path_elemental_mastery",
+        "path_hand_destruction",
+        "path_lure_flames",
+        "path_beckoning",
+        "path_neptune",
+        "path_incarnation",
+        "path_mars",
+        "path_fathers_vengeance",
+        "path_corruption",
+        "path_technomancy",
+        "path_flora",
+        "thaumaturgic_countermagic",
+        "weather_control"
+      ]
+    },
+    { "id": "quietus", "name": "Упокоение (Quietus)", "category": "unique" },
+    { "id": "chimerstry", "name": "Фантасмагория (Chimerstry)", "category": "unique" }
+  ]
+}

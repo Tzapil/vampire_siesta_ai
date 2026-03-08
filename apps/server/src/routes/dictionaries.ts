@@ -31,7 +31,7 @@ router.get(
   "/disciplines",
   asyncHandler(async (_req, res) => {
     const items = await DisciplineModel.find()
-      .select("key labelRu -_id")
+      .select("key labelRu description category -_id")
       .lean();
     res.json(items);
   })
@@ -41,7 +41,7 @@ router.get(
   "/attributes",
   asyncHandler(async (_req, res) => {
     const items = await AttributeModel.find()
-      .select("key labelRu group -_id")
+      .select("key labelRu group description specializationAt specializationDescription pageRef -_id")
       .lean();
     res.json(items);
   })
@@ -51,7 +51,7 @@ router.get(
   "/abilities",
   asyncHandler(async (_req, res) => {
     const items = await AbilityModel.find()
-      .select("key labelRu group -_id")
+      .select("key labelRu group description specializationAt specializationDescription pageRef -_id")
       .lean();
     res.json(items);
   })
@@ -61,7 +61,7 @@ router.get(
   "/backgrounds",
   asyncHandler(async (_req, res) => {
     const items = await BackgroundModel.find()
-      .select("key labelRu -_id")
+      .select("key labelRu description maxValue -_id")
       .lean();
     res.json(items);
   })

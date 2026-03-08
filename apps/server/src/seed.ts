@@ -1,3 +1,5 @@
+﻿import fs from "fs";
+import path from "path";
 import { connectToDatabase } from "./db/connection";
 import { loadEnv } from "./utils/loadEnv";
 import {
@@ -16,12 +18,91 @@ import {
   VirtueModel
 } from "./db";
 
-async function upsertByKey(model: any, items: Array<Record<string, any>>) {
+type AbilityJsonItem = {
+  id: string;
+  name: string;
+  specializationAt?: number;
+  specializationDescription?: string;
+  description?: string;
+  pageRef?: string;
+};
+
+type AttributeJsonItem = AbilityJsonItem;
+
+type DisciplineJsonItem = {
+  id: string;
+  name: string;
+  category?: string;
+};
+
+type ClanJsonItem = {
+  id: string;
+  name: string;
+  disciplines: string[];
+  weakness?: string;
+};
+
+type BackgroundJsonItem = {
+  id: string;
+  name: string;
+  description?: string;
+  maxValue?: number;
+};
+
+type ArchetypeJsonItem = {
+  id: string;
+  name: string;
+  description?: string;
+};
+
+type MeritFlawJsonItem = {
+  id: string;
+  name: string;
+  cost: number | "variable";
+  minCost?: number;
+  maxCost?: number;
+  description?: string;
+};
+
+const DATA_DIR = path.resolve(__dirname, "../../../data");
+const DEFAULT_CHRONICLE_NAME = "Без хроники";
+
+function readJson<T>(fileName: string): T {
+  const filePath = path.join(DATA_DIR, fileName);
+  const raw = fs.readFileSync(filePath, "utf-8");
+  return JSON.parse(raw) as T;
+}
+
+async function syncByKey(model: any, items: Array<Record<string, any>>) {
+  const keys = items.map((item) => item.key);
+  if (keys.length > 0) {
+    await model.deleteMany({ key: { $nin: keys } });
+  }
   await Promise.all(
-    items.map((item) =>
-      model.updateOne({ key: item.key }, { $set: item }, { upsert: true })
-    )
+    items.map((item) => model.updateOne({ key: item.key }, { $set: item }, { upsert: true }))
   );
+}
+
+function extractMeritsOrFlaws(data: Record<string, unknown>) {
+  const items: Array<Record<string, any>> = [];
+  for (const value of Object.values(data)) {
+    if (!Array.isArray(value)) continue;
+    for (const item of value as MeritFlawJsonItem[]) {
+      const isVariable = item.cost === "variable";
+      const minCost = isVariable ? item.minCost : undefined;
+      const maxCost = isVariable ? item.maxCost : undefined;
+      const pointCost = typeof item.cost === "number" ? item.cost : minCost ?? 1;
+      items.push({
+        key: item.id,
+        labelRu: item.name,
+        pointCost,
+        description: item.description ?? "",
+        minCost,
+        maxCost
+      });
+    }
+  }
+  return items;
 }
 
 loadEnv();
@@ -30,8 +111,8 @@ async function seed() {
   await connectToDatabase(process.env.MONGO_URL);
 
   await ChronicleModel.updateOne(
-    { name: "Без хроники" },
-    { $setOnInsert: { name: "Без хроники" } },
+    { name: DEFAULT_CHRONICLE_NAME },
+    { $setOnInsert: { name: DEFAULT_CHRONICLE_NAME } },
     { upsert: true }
   );
 
@@ -55,132 +136,94 @@ async function seed() {
     )
   );
 
-  await upsertByKey(DisciplineModel, [
-    { key: "animalism", labelRu: "Анимализм" },
-    { key: "obfuscate", labelRu: "Обфускация" },
-    { key: "potence", labelRu: "Потенция" },
-    { key: "celerity", labelRu: "Скорость" },
-    { key: "presence", labelRu: "Присутствие" }
-  ]);
+  const disciplinesData = readJson<Record<string, DisciplineJsonItem[]>>("disciplines.json");
+  const disciplines = Object.values(disciplinesData)
+    .flat()
+    .map((item) => ({
+      key: item.id,
+      labelRu: item.name,
+      category: item.category
+    }));
 
-  await upsertByKey(ClanModel, [
-    {
-      key: "nosferatu",
-      labelRu: "Носферату",
-      disciplineKeys: ["animalism", "obfuscate", "potence"],
-      rules: { appearanceFixedTo: 0 }
-    },
-    {
-      key: "brujah",
-      labelRu: "Бруха",
-      disciplineKeys: ["celerity", "potence", "presence"]
-    }
-  ]);
+  await syncByKey(DisciplineModel, disciplines);
 
-  await upsertByKey(AttributeModel, [
-    { key: "strength", labelRu: "Сила", group: "physical" },
-    { key: "dexterity", labelRu: "Ловкость", group: "physical" },
-    { key: "stamina", labelRu: "Выносливость", group: "physical" },
-    { key: "charisma", labelRu: "Харизма", group: "social" },
-    { key: "manipulation", labelRu: "Манипуляция", group: "social" },
-    { key: "appearance", labelRu: "Внешность", group: "social" },
-    { key: "perception", labelRu: "Восприятие", group: "mental" },
-    { key: "intelligence", labelRu: "Интеллект", group: "mental" },
-    { key: "wits", labelRu: "Сообразительность", group: "mental" }
-  ]);
+  const clansData = readJson<ClanJsonItem[]>("clans.json");
+  const clans = clansData.map((item) => ({
+    key: item.id,
+    labelRu: item.name,
+    disciplineKeys: item.disciplines,
+    weakness: item.weakness ?? "",
+    rules: item.id === "nosferatu" ? { appearanceFixedTo: 0 } : {}
+  }));
 
-  await upsertByKey(AbilityModel, [
-    { key: "alertness", labelRu: "Бдительность", group: "talents" },
-    { key: "athletics", labelRu: "Атлетика", group: "talents" },
-    { key: "brawl", labelRu: "Драка", group: "talents" },
-    { key: "empathy", labelRu: "Эмпатия", group: "talents" },
-    { key: "expression", labelRu: "Самовыражение", group: "talents" },
-    { key: "intimidation", labelRu: "Запугивание", group: "talents" },
-    { key: "leadership", labelRu: "Лидерство", group: "talents" },
-    { key: "streetwise", labelRu: "Уличная смекалка", group: "talents" },
-    { key: "subterfuge", labelRu: "Уловки", group: "talents" },
+  await syncByKey(ClanModel, clans);
 
-    { key: "animalKen", labelRu: "Обращение с животными", group: "skills" },
-    { key: "crafts", labelRu: "Ремёсла", group: "skills" },
-    { key: "drive", labelRu: "Вождение", group: "skills" },
-    { key: "etiquette", labelRu: "Этикет", group: "skills" },
-    { key: "firearms", labelRu: "Огнестрел", group: "skills" },
-    { key: "melee", labelRu: "Ближний бой", group: "skills" },
-    { key: "performance", labelRu: "Выступления", group: "skills" },
-    { key: "security", labelRu: "Безопасность", group: "skills" },
-    { key: "stealth", labelRu: "Скрытность", group: "skills" },
-    { key: "survival", labelRu: "Выживание", group: "skills" },
+  const attributesData = readJson<Record<string, AttributeJsonItem[]>>("attributes.json");
+  const attributes = Object.entries(attributesData).flatMap(([group, items]) =>
+    items.map((item) => ({
+      key: item.id,
+      labelRu: item.name,
+      group,
+      specializationAt: item.specializationAt,
+      specializationDescription: item.specializationDescription ?? "",
+      description: item.description ?? "",
+      pageRef: item.pageRef ?? ""
+    }))
+  );
 
-    { key: "academics", labelRu: "Академические знания", group: "knowledges" },
-    { key: "computer", labelRu: "Компьютеры", group: "knowledges" },
-    { key: "finance", labelRu: "Финансы", group: "knowledges" },
-    { key: "investigation", labelRu: "Расследование", group: "knowledges" },
-    { key: "law", labelRu: "Право", group: "knowledges" },
-    { key: "linguistics", labelRu: "Лингвистика", group: "knowledges" },
-    { key: "medicine", labelRu: "Медицина", group: "knowledges" },
-    { key: "occult", labelRu: "Оккультизм", group: "knowledges" },
-    { key: "politics", labelRu: "Политика", group: "knowledges" },
-    { key: "science", labelRu: "Наука", group: "knowledges" }
-  ]);
+  await syncByKey(AttributeModel, attributes);
 
-  await upsertByKey(BackgroundModel, [
-    { key: "allies", labelRu: "Союзники" },
-    { key: "contacts", labelRu: "Контакты" },
-    { key: "resources", labelRu: "Ресурсы" },
-    { key: "status", labelRu: "Статус" },
-    { key: "mentor", labelRu: "Наставник" }
-  ]);
+  const abilitiesData = readJson<Record<string, AbilityJsonItem[]>>("abilities.json");
+  const abilities = Object.entries(abilitiesData).flatMap(([group, items]) =>
+    items.map((item) => ({
+      key: item.id,
+      labelRu: item.name,
+      group,
+      specializationAt: item.specializationAt,
+      specializationDescription: item.specializationDescription ?? "",
+      description: item.description ?? "",
+      pageRef: item.pageRef ?? ""
+    }))
+  );
 
-  await upsertByKey(VirtueModel, [
+  await syncByKey(AbilityModel, abilities);
+
+  const backgroundsData = readJson<BackgroundJsonItem[]>("backgrounds.json");
+  const backgrounds = backgroundsData.map((item) => ({
+    key: item.id,
+    labelRu: item.name,
+    description: item.description ?? "",
+    maxValue: item.maxValue
+  }));
+
+  await syncByKey(BackgroundModel, backgrounds);
+
+  await syncByKey(VirtueModel, [
     { key: "conscience", labelRu: "Совесть" },
     { key: "selfControl", labelRu: "Самообладание" },
     { key: "courage", labelRu: "Мужество" }
   ]);
 
-  await upsertByKey(SectModel, [
+  await syncByKey(SectModel, [
     { key: "camarilla", labelRu: "Камарилья" },
     { key: "sabbat", labelRu: "Шабаш" }
   ]);
 
-  await upsertByKey(NatureModel, [
-    { key: "survivor", labelRu: "Выживший" },
-    { key: "visionary", labelRu: "Мечтатель" }
-  ]);
+  const archetypesData = readJson<ArchetypeJsonItem[]>("archetypes.json");
+  const archetypes = archetypesData.map((item) => ({
+    key: item.id,
+    labelRu: item.name,
+    description: item.description ?? ""
+  }));
 
-  await upsertByKey(DemeanorModel, [
-    { key: "stoic", labelRu: "Стоик" },
-    { key: "bonVivant", labelRu: "Бон виван" }
-  ]);
+  await syncByKey(NatureModel, archetypes);
+  await syncByKey(DemeanorModel, archetypes);
 
-  await upsertByKey(MeritModel, [
-    {
-      key: "acuteSense",
-      labelRu: "Острое чувство",
-      pointCost: 1,
-      description: "Вы обладаете очень острыми чувствами."
-    },
-    {
-      key: "catlikeBalance",
-      labelRu: "Кошачья грация",
-      pointCost: 2,
-      description: "Вы сохраняете баланс в сложных условиях."
-    }
-  ]);
+  const meritsData = readJson<Record<string, unknown>>("merits.json");
+  await syncByKey(MeritModel, extractMeritsOrFlaws(meritsData));
 
-  await upsertByKey(FlawModel, [
-    {
-      key: "nightmares",
-      labelRu: "Кошмары",
-      pointCost: 1,
-      description: "Вас мучают кошмары, влияющие на отдых."
-    },
-    {
-      key: "darkSecret",
-      labelRu: "Тёмная тайна",
-      pointCost: 2,
-      description: "У вас есть тайна, которую нужно скрывать."
-    }
-  ]);
+  const flawsData = readJson<Record<string, unknown>>("flaws.json");
+  await syncByKey(FlawModel, extractMeritsOrFlaws(flawsData));
 
   console.log("Seed завершён");
   process.exit(0);
@@ -190,4 +233,3 @@ seed().catch((error) => {
   console.error("Seed завершился с ошибкой:", error);
   process.exit(1);
 });
-

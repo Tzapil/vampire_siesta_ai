@@ -1,0 +1,2828 @@
+Merits and Flaws can add a distinct dimension to your character. Merits are special advantages unique to the character, while Flaws are liabilities or disadvantages that create challenges to the character's activities. 
+
+Merits cost Freebie Points while Flaws add Freebie Points.  In Character Generation, you get 15 Freebie Points if you are playing a supernatural character (e.g. a Vampire or Mage) and 21 Freebie Points if you are not (e.g. a plain human).  Freebie Points are spent to buy advantages for your character (higher starting stats and Merits).
+
+You can increase your starting amount of Freebie Points by taking one or more Flaws.  Each Flaw has a rating which will add to your Freebie Points pool. You may select up to 7 points' worth. If particular flaws intrigue you thanks to the type of character they would create, but they happen to add up to a number greater than 7, you may still take them, but you will not gain more than 7 Freebie points. If you feel like there is worthwhile narrative payoff for portraying these flaws without any positive tradeoff, you are welcome to do so.
+
+As said before, Freebie points are spent to buy advantages for your character.  Merits are one such advantage.  You can purchase an amount of Merits equal to your Freebies rating.
+
+= Buying Merits With XP =
+With the sole exception of the Language(s) merit, Merits can not be purchased with XP during character generation.  Each additional Language you wish to acquire costs 3 XP.  All other Merits cost Freebie Points.
+
+After character generation, characters may continue to buy additional Languages at 3 XP per Language.  For any other Merits or Flaws, IC circumstances may cause your character to take a Flaw or qualify them to purchase a Merit according to Staff discretion.  This acquisition of Merits and Flaws are meant to reflect the consequences of story or character developments.  PRP runners may nominate another character for a Merit or Flaw but are not empowered to administer them.  Players are welcome to inform staff of their goals to acquire certain Merits and Flaws and plan for the appropriate IC experiences.
+
+When a character acquires a Flaw, that character also acquires an amount of XP equal to ''[5 x Flaw Rating]''.  When a character acquires a Merit, that character must spend an amount of XP equal to ''[5 x Merit Rating]''.   For example, were a character to acquire 3 points of the PTSD flaw at the end of a very traumatic experience, they would also get 15 XP.  Were a Nosferatu to create a 2-point Spawning Pool, they would need to pay 10 XP. 
+
+For the most part, Merit and Flaw acquisition is voluntary.  However, a Mage who becomes a Ghoul automatically acquires the 5 point Ghoul merit (Book of Secrets, page 75) and the 3 point Addiction flaw.  As the Ghoul merit costs 25 XP, and the Addiction flaw administers 15 XP, the net cost of becoming a Ghoul is 10 XP.  This 10 XP will be taken by Staff regardless of if the character in question has it, so somebody who becomes a Ghoul with insufficient XP will go into the negatives.
+
+= Merits Available =
+== Physical Merits ==
+{| class="wikitable sortable"
+! Merit Name
+! Point Value
+! Short Description
+! Page Reference
+! Available To
+|-
+| Acute Sense
+| 1 
+| -2 difficulty to perception rolls pertaining to a specific sense.
+| P 479 V20 Core
+| Everyone
+|-
+| Acute Senses
+| 3 
+| -2 difficutly for all perception rolls
+| P 35 BoS
+| Everyone
+|-
+| Alcohol/Drug Tolerance
+| 1 or 2
+| Can make Stamina rolls to shake off effects of intoxication
+| P 35 BoS
+| Everyone
+|- 
+| Ambidextrous
+| 1
+| Self explanatory
+| P 480 V20 Core
+| Everyone
+|- 
+| Bruiser
+| 1
+| Others find it harder to intimidate you
+| P 480 V20 Core
+| Everyone
+|- 
+| Catlike Balance
+| 1
+| Lowers difficulties of balance-related rolls 
+| P 480 V20 core
+| Everyone
+|-
+| Daredevil
+| 3
+| Adds benefits to your rolls when you do something ballsy 
+| P 480 V20 core
+| Everyone
+|- 
+| Enchanting Feature
+| 2
+| Standout feature about you that's so good you get benefits
+| P 36 BoS
+| Everyone
+|- 
+| Enchanting Voice
+| 2
+| Standout voice, benefits rolls involving use of the voice
+| P 480 V20 core
+| Everyone
+|- 
+| Friendly Face
+| 1
+| Amiable, social based rolls with strangers are easier on a first meeting
+| P 480 V20 core
+| Everyone
+|-
+| Huge Size
+| 4
+| You're yuge, you get an extra health box
+| P 480 V20 core
+| Everyone
+|-
+| Hyperflexible
+| 1
+| Self-explanatory, reduces difficulties
+| P 36, BoS
+| Everyone
+|-
+| Insensible To Pain
+| 5
+| Pain don't hurt
+| P 38, BoS
+| Everyone
+|-
+| Noble Blood
+| 1
+| Well isn't your family tree special! You can get dice benefits if you're dealing with snooty peeps
+| P 36, BoS
+| Everyone
+|-
+| Physically Impressive
+| 2
+| You are one imposing sumbitch
+| P 37, BoS
+| Everyone
+|-
+| Poker Face 
+| 2
+| Nothing rattles you. Nothing. 
+| P 38, BoS
+| Everyone
+|-
+| Blush of Health
+| 2 
+|
+|
+| Vampire
+|-
+| Cloak Of The Seasons
+| 3 
+|
+|
+| Verbena
+|-
+| Early Riser
+| 1 
+|
+|
+| Vampire
+|-
+| Eat Food
+| 1 
+|
+|
+| Vampire
+|-
+| Efficient Digestion
+| 3 
+|
+|
+| Vampire
+|-
+| Hypersensitivity
+| 3 
+|
+|
+| Everyone
+|-
+| Immunity
+| 2 
+|
+|
+| Mage
+|-
+| Too Tough To Die
+| 5 
+|
+|
+| Mage
+|-
+|}
+
+== Mental Merits ==
+{| class="wikitable sortable"
+! Name
+! Point Value
+! Short Description
+! Page Reference
+! Available To
+|-
+| Artistically Gifted
+| 1 
+|
+|
+| Everyone
+|-
+| Berserker / Stress Atavism
+| 4 
+|
+|
+| Mage
+|-
+| Calm Heart
+| 3 
+|
+|
+| Vampire
+|-
+| Code of Honor
+| 2 
+|
+|
+| Everyone
+|-
+| Coldly Logical
+| 1 
+|
+|
+| Everyone
+|-
+| Common Sense
+| 1 
+|
+|
+| Everyone
+|-
+| Computer Aptitude
+| 2 
+|
+|
+| Everyone
+|-
+| Concentration
+| 1 
+|
+|
+| Everyone
+|-
+| Eidetic Memory
+| 2 
+|
+|
+| Everyone
+|-
+| Hyperfocus
+| 3 
+|
+|
+| Everyone
+|-
+| Inner Strength
+| 2 
+|
+|
+| Everyone
+|-
+| Introspection
+| 1 
+|
+|
+| Everyone
+|-
+| Iron Will
+| 3 
+|
+|
+| Everyone
+|-
+| Jack-of-All-Trades
+| 3 
+|
+|
+| Everyone
+|-
+| Judge's Wisdom
+| 4 
+|
+|
+| Mage
+|-
+| Language
+| 1 to 5
+|
+|
+| Everyone
+|-
+| Lightning Calculator
+| 1 
+|
+|
+| Everyone
+|-
+| Light Sleeper
+| 2 
+|
+|
+| Vampire
+|-
+| Mechanical Aptitude
+| 1 
+|
+|
+| Everyone
+|-
+| Natural Linguist
+| 2 
+|
+|
+| Everyone
+|-
+| Scientific Mystic / Techgnosi
+| 3 
+|
+|
+| Mage
+|-
+| Self-Confident
+| 5 
+|
+|
+| Everyone
+|-
+| Strength of Psyche
+| 2 
+|
+|
+| Human
+|-
+| Time Sense
+| 1 
+|
+|
+| Everyone
+|-
+| Useful Knowledge
+| 1 
+|
+|
+| Everyone
+|}
+
+== Social Merits ==
+{| class="wikitable sortable"
+! Merit Name
+! Point Value
+! Short Description
+! Page Reference
+! Available To
+|-
+| Animal Magnetism
+| 2 
+|
+|
+| Everyone
+|-
+| Bullyboy
+| 2 
+|
+|
+| Vampire
+|-
+| Confidence
+| 2 
+|
+|
+| Everyone
+|-
+| Dark Triad
+| 3 
+|
+|
+| Everyone
+|-
+| Elysium Regular
+| 1 
+|
+|
+| Vampire
+|-
+| Family Support
+| 3 
+|
+|
+| Mage
+|-
+| Family Support
+| 1 
+|
+|
+| Mage
+|-
+| Family Support
+| 2 
+|
+|
+| Mage
+|-
+| Favor
+| 2 
+|
+|
+| Mage
+|-
+| Favor
+| 1 
+|
+|
+| Mage
+|-
+| Favor
+| 3 
+|
+|
+| Mage
+|-
+| Folk Hero
+| 3 
+|
+|
+| Mage
+|-
+| Former Ghoul
+| 1 
+|
+|
+| Vampire
+|-
+| Friend of the Underground
+| 3 
+|
+|
+| Vampire
+|-
+| Groomed for Embrace
+| 5 
+|
+|
+| Ghoul
+|-
+| Harmless
+| 1 
+|
+|
+| Everyone
+|-
+| Honored Lineage
+| 2 
+|
+|
+| Verbena
+|-
+| Local Hero
+| 3 
+|
+|
+| Everyone
+|-
+| Loyalty
+| 1 
+|
+|
+| Mage
+|-
+| Major Boon
+| 4 
+|
+|
+| Vampire
+|-
+| Master of Red Tape
+| 4 
+|
+|
+| Everyone
+|-
+| Minor Boon
+| 2 
+|
+|
+| Vampire
+|-
+| Mourner's Chant
+| 3 
+|
+|
+| Mage
+|-
+| Natural Leader
+| 1 
+|
+|
+| Everyone
+|-
+| Open Road
+| 2 
+|
+|
+| Vampire
+|-
+| Perfect Liar
+| 2 
+|
+|
+| Everyone
+|-
+| Pitiable
+| 1 
+|
+|
+| Everyone
+|-
+| Prestige
+| 2 
+|
+|
+| Everyone
+|-
+| Prestigious Mentor
+| 1 
+|
+|
+| Mage
+|-
+| Prestigious Sire
+| 1 
+|
+|
+| Vampire
+|-
+| Protege
+| 1 
+|
+|
+| Vampire
+|-
+| Regal Bearing
+| 1 
+|
+|
+| Everyone
+|-
+| Rep
+| 1 
+|
+|
+| Everyone
+|-
+| Rising Star
+| 3 
+|
+|
+| Mage
+|-
+| Sabbat Survivor
+| 1 
+|
+|
+| Everyone
+|-
+| Sanctity
+| 2 
+|
+|
+| Everyone
+|-
+| Scholar of Enemies
+| 2 
+|
+|
+| Vampire
+|-
+| Scholar of Others
+| 2 
+|
+|
+| Everyone
+|-
+| Secret Code Language
+| 2 
+|
+|
+| Everyone
+|-
+| Sect Enmity
+| 1 
+|
+|
+| Mage
+|-
+| Socially Networked
+| 2 
+|
+|
+| Everyone
+|-
+| Subculture Insider
+| 2 
+|
+|
+| Everyone
+|-
+| Trivial Boon
+| 1 
+|
+|
+| Vampire
+|-
+| True Love
+| 4 
+|
+|
+| Everyone
+|-
+| Unobtrusive
+| 1 
+|
+|
+| Everyone
+|}
+
+== Supernatural Merits ==
+{| class="wikitable sortable"
+! Merit Name
+! Point Value
+! Short Description
+! Page Reference
+! Available To
+|-
+| Addictive Blood
+| 3 
+|
+|
+| Follower of Set Vassal
+|-
+| Additional Discipline
+| 5 
+|
+|
+| Vampire
+|-
+| Astral Vigor
+| 3 
+|
+|
+| Mage
+|-
+| Aura of Command
+| 3 
+|
+|
+| Lasombra
+|-
+| Avatar Companion
+| 7 
+|
+|
+| Mage
+|-
+| Bardic Gift
+| 2 
+|
+|
+| Mage
+|-
+| Betrayer's Mark
+| 3 
+|
+|
+| Tremere
+|-
+| Bioluminescence
+| 1 
+|
+|
+| Tzimisce
+|-
+| Blood Flaw Immunity
+| 5 
+|
+|
+| Ghoul
+|-
+| Brahmin
+| 1 
+|
+|
+| Ravnos
+|-
+| Burning Aura
+| 1 
+|
+|
+| Mage
+|-
+| Call of the Sea
+| 2 
+|
+|
+| Lasombra
+|-
+| Cannibal
+| 1 
+|
+|
+| Giovanni
+|-
+| Celestial Affinity
+| 3 
+|
+|
+| Mage
+|-
+| Circumspect Avatar
+| 2 
+|
+|
+| Mage
+|-
+| Clear Sighted
+| 5 
+|
+|
+| Mage
+|-
+| Clear-Sighted
+| 4 
+|
+|
+| Ghoul
+|-
+| Cold Read
+| 3 
+|
+|
+| Malkavian
+|-
+| Connoisseur
+| 2 
+|
+|
+| Ventrue
+|-
+| Consanguineous Resistance
+| 1 
+|
+|
+| Giovanni
+|-
+| Controllable Night Sight
+| 2 
+|
+|
+| Lasombra
+|-
+| Court Favorite
+| 5 
+|
+|
+| Lasombra
+|-
+| Court Favorite
+| 3 
+|
+|
+| Lasombra
+|-
+| Court Favorite
+| 4 
+|
+|
+| Lasombra
+|-
+| Court Favorite
+| 1 
+|
+|
+| Lasombra
+|-
+| Court Favorite
+| 2 
+|
+|
+| Lasombra
+|-
+| Critters
+| 2 
+|
+|
+| Ravnos
+|-
+| Cyclic Magic
+| 3 
+|
+|
+| Mage
+|-
+| Danger Sense
+| 2 
+|
+|
+| Everyone
+|-
+| Death Grip
+| 3 
+|
+|
+| Vampire
+|-
+| Deathwalker
+| 4 
+|
+|
+| Chakravanti
+|-
+| Deceptive Aura
+| 1 
+|
+|
+| Vampire
+|-
+| Disciple Of Lazarus
+| 2 
+|
+|
+| Harbinger of Skulls
+|-
+| Distracting Aura
+| 2 
+|
+|
+| Malkavian
+|-
+| Dracon's Temperament
+| 3 
+|
+|
+| Tzimisce
+|-
+| Drug Resistance
+| 2 
+|
+|
+| Follower of Set
+|-
+| Dual Affiliation
+| 7 
+|
+|
+| Mage
+|-
+| Embraced Without The Cup
+| 1 
+|
+|
+| Tremere
+|-
+| Eyes of Shadow
+| 1 
+|
+|
+| Lasombra
+|-
+| Eyes of Shadow
+| 4 
+|
+|
+| Lasombra
+|-
+| Eyes of Shadow
+| 2 
+|
+|
+| Lasombra
+|-
+| Eyes of Shadow
+| 3 
+|
+|
+| Lasombra
+|-
+| False Reflection
+| 3 
+|
+|
+| Nosferatu
+|-
+| Fury's Focus
+| 3 
+|
+|
+| Brujah
+|-
+| Green Thumb
+| 1 
+|
+|
+| Mage
+|-
+| Guardian Angel
+| 6 
+|
+|
+| Mage
+|-
+| Half-life
+| 4 
+|
+|
+| Cappadocian
+|-
+| Hands of Daedalus
+| 3 
+|
+|
+| Mage
+|-
+| Haven Affinity
+| 3 
+|
+|
+| Tzimisce
+|-
+| Healing Touch
+| 1 
+|
+|
+| Vampire
+|-
+| Heart of Needles
+| 3 
+|
+|
+| Ravnos
+|-
+| Hidden Diablerie
+| 3 
+|
+|
+| Vampire
+|-
+| Hive Minded
+| 1 
+|
+|
+| Gangrel
+|-
+| Hive Minded
+| 2 
+|
+|
+| Gangrel
+|-
+| Immortal
+| 5 
+|
+|
+| Mage
+|-
+| Immortal
+| 7 
+|
+|
+| Mage
+|-
+| Impressive Restraint
+| 2 
+|
+|
+| Toreador
+|-
+| Indelible
+| 1 
+|
+|
+| Toreador
+|-
+| Indelible
+| 2 
+|
+|
+| Toreador
+|-
+| Inner Knight
+| 5 
+|
+|
+| Mage
+|-
+| Inoffensive to Animals
+| 1 
+|
+|
+| Vampire
+|-
+| Instrument of God
+| 5 
+|
+|
+| Lasombra
+|-
+| Keys To The Library
+| 2 
+|
+|
+| Tremere
+|-
+| Keys To The Library
+| 4 
+|
+|
+| Tremere
+|-
+| Keys To The Library
+| 1 
+|
+|
+| Tremere
+|-
+| Keys To The Library
+| 3 
+|
+|
+| Tremere
+|-
+| Keys To The Library
+| 5 
+|
+|
+| Tremere
+|-
+| King of Shadow
+| 4 
+|
+|
+| Lasombra
+|-
+| Kshatriya
+| 1 
+|
+|
+| Ravnos
+|-
+| Legendary Attribute
+| 5 
+|
+|
+| Mage
+|-
+| Legerdemain
+| 1 
+|
+|
+| Ravnos
+|-
+| Lesser Mark of the Beast
+| 4 
+|
+|
+| Gangrel
+|-
+| Lizard Limbs
+| 1 
+|
+|
+| Nosferatu
+|-
+| Long Fingers
+| 1 
+|
+|
+| Nosferatu
+|-
+| Long-lived
+| 1 
+|
+|
+| Verbena
+|-
+| Lucky
+| 3 
+|
+|
+| Everyone
+|-
+| Mad Science
+| 2 
+|
+|
+| Society of Ether
+|-
+| Magic Resistance
+| 2 
+|
+|
+| Vampire
+|-
+| Manifest Avatar
+| 3 
+|
+|
+| Mage
+|-
+| Mark of Favor
+| 3 
+|
+|
+| Everyone
+|-
+| Master of the Masquerade
+| 2 
+|
+|
+| Toreador
+|-
+| Medium
+| 2 
+|
+|
+| Everyone
+|-
+| Member of the Pack
+| 2 
+|
+|
+| Gangrel
+|-
+| Monstrous Maw
+| 1 
+|
+|
+| Nosferatu
+|-
+| Mortuario
+| 4 
+|
+|
+| Giovanni
+|-
+| Mortuario
+| 2 
+|
+|
+| Giovanni
+|-
+| Mute Devotion
+| 1 
+|
+|
+| Ravnos
+|-
+| Natural Channel
+| 3 
+|
+|
+| Mage
+|-
+| Natural Shallowing
+| 5 
+|
+|
+| Mage
+|-
+| Natural Shapeshifter
+| 3 
+|
+|
+| Verbena
+|-
+| Nine Lives
+| 6 
+|
+|
+| Everyone
+|-
+| Oathbreaker
+| 4 
+|
+|
+| Mage
+|-
+| Oracular Ability
+| 3 
+|
+|
+| Everyone
+|-
+| Pain Tolerance
+| 2 
+|
+|
+| Tzimisce
+|-
+| Pale Aura
+| 2 
+|
+|
+| Ghoul
+|-
+| Parlor Trick
+| 1 
+|
+|
+| Mage
+|-
+| Parlor Trick
+| 3 
+|
+|
+| Mage
+|-
+| Patagia
+| 4 
+|
+|
+| Nosferatu
+|-
+| Personal Masquerade
+| 3 
+|
+|
+| Clanless
+|-
+| Personal Talisman
+| 1 
+|
+|
+| Mage
+|-
+| Piscine
+| 1 
+|
+|
+| Nosferatu
+|-
+| Privacy Obsession
+| 3 
+|
+|
+| Tzimisce
+|-
+| Promethean Clay
+| 5 
+|
+|
+| Tzimisce
+|-
+| Prophetic Dreams
+| 2 
+|
+|
+| Malkavian
+|-
+| Quartermaster
+| 3 
+|
+|
+| Tremere
+|-
+| Revenant Weakness
+| 3 
+|
+|
+| Tzimisce
+|-
+| Rugged Bad Looks
+| 5 
+|
+|
+| Nosferatu
+|-
+| Sanguine Incongruity
+| 5 
+|
+|
+| Giovanni
+|-
+| Scent Of The Other
+| 1 
+|
+|
+| Salubri
+|-
+| Secret Society Member
+| 1 
+|
+|
+| Tremere
+|-
+| Sectarian Ally
+| 1 
+|
+|
+| Assamite
+|-
+| Shattered Avatar
+| 5 
+|
+|
+| Mage
+|-
+| Sight Beyond Sight
+| 3 
+|
+|
+| Salubri
+|-
+| Skald
+| 2 
+|
+|
+| Gangrel
+|-
+| Sleep Unseen
+| 2 
+|
+|
+| Nosferatu
+|-
+| Slimy
+| 1 
+|
+|
+| Nosferatu
+|-
+| Slowed Degeneration
+| 5 
+|
+|
+| Toreador
+|-
+| Spark of Life
+| 5 
+|
+|
+| Mage
+|-
+| Spawning Pool
+| 3 
+|
+|
+| Nosferatu
+|-
+| Spawning Pool
+| 2 
+|
+|
+| Nosferatu
+|-
+| Spawning Pool
+| 1 
+|
+|
+| Nosferatu
+|-
+| Spirit Magnet
+| 3 
+|
+|
+| Mage
+|-
+| Spirit Magnet
+| 7 
+|
+|
+| Mage
+|-
+| Spirit Mentor
+| 3 
+|
+|
+| Everyone
+|-
+| Stitcher
+| 3 
+|
+|
+| Vampire
+|-
+| Stormwarden
+| 5 
+|
+|
+| Mage
+|-
+| Stormwarden
+| 3 
+|
+|
+| Mage
+|-
+| Styx Baptism
+| 3 
+|
+|
+| Cappadocian
+|-
+| Thousand Meter Killer
+| 1 
+|
+|
+| Assamite
+|-
+| Totemic Change
+| 5 
+|
+|
+| Gangrel
+|-
+| Tough Hide
+| 2 
+|
+|
+| Nosferatu
+|-
+| Tunnel Rat
+| 3 
+|
+|
+| Nosferatu
+|-
+| Tunnel Rat
+| 5 
+|
+|
+| Nosferatu
+|-
+| Tunnel Rat
+| 1 
+|
+|
+| Nosferatu
+|-
+| Tunnel Rat
+| 4 
+|
+|
+| Nosferatu
+|-
+| Tunnel Rat
+| 2 
+|
+|
+| Nosferatu
+|-
+| Twin Souls
+| 4 
+|
+|
+| Mage
+|-
+| Umbral Affinity
+| 4 
+|
+|
+| Mage
+|-
+| Unaging
+| 2 
+|
+|
+| Mage
+|-
+| Unbondable
+| 5 
+|
+|
+| Mage
+|-
+| Unmarked Antitribu
+| 5 
+|
+|
+| Tremere
+|-
+| Unmarked Antitribu
+| 2 
+|
+|
+| Tremere
+|-
+| Vaishya
+| 1 
+|
+|
+| Ravnos
+|}
+
+= Flaws Available =
+
+== Physical Flaws ==
+{| class="wikitable sortable"
+! Name
+! Point Values
+! Short Description
+! Read More
+! Available To
+|-
+| Addiction
+| -1
+| You are addicted to an act or substance, from caffeine to cocaine.
+| P 39 BoS
+| Everyone
+|-
+| Addiction
+| -3 
+| You are a '''vampire''' addicted to a substance and must have it in your victims' blood
+| P 482 V20 Core
+| Vampire
+|-
+| Bad Sight
+| -1, -3 
+| You can't see too hot.  You may need glasses.
+| p 481 V20 Core
+| Everyone
+|-
+| Blind
+| -6 
+| You can't see at all.
+| P 484 V20 Core
+| Everyone
+|-
+| Deaf
+| -4 
+| P 483 V20 Core
+| You can't hear.
+| Everyone
+|-
+| Deformity
+| -3 
+| You have a profound physical deformity.
+| P 482 V20 Core
+| Everyone
+|-
+| Degeneration
+| -3, -6, or -9
+| Your body is falling apart.
+| P 41 BoS
+| Mage
+|-
+| Disease Carrier
+| -4 
+| You're a harbinger of plague
+| P 483 V20 Core
+| Vampire
+|-
+| Disfigured
+| -2 
+| P 482 V20 Core
+| You have a deformity. It ain't pretty.
+| Everyone
+|-
+| Dulled Bite
+| -2 
+| Your teeth aren't sharp enough to hunt like the cool vampires.
+| P 492 V20 Core
+| Vampire
+|-
+| Easily Intoxicated
+| -2 
+| You're a teetotaler.
+| P 40 BoS
+| Everyone
+|-
+| Fifteenth Generation
+| -4 
+| You're a 15th Generation vampire.
+| P 481-482 V20 Core
+| Vampire
+|-
+| Flesh of the Corpse
+| -5 
+| You're quite literally an ambulatory corpse. Gross.
+| P 483 V20 Core
+| Vampire
+|-
+| Fourteenth Generation
+| -2
+| You're a 14th Generation vampire.
+| P 471 V20 Core
+| Vampire
+|-
+| Glowing Eyes
+| -3 
+| Self explanatory. Wear some ski goggles.
+| P 482 V20 Core.
+| Vampire
+|-
+| Hard of Hearing
+| -1 
+| Wha?
+| P 480 V20 Core
+| Everyone
+|-
+| Horrific
+| -5 
+| You make people throw up in their mouth at least.
+| P 41 BoS
+| Everyone
+|-
+| Infectious Bite
+| -2 
+| You've got nasty-ass komodo dragon mouth.
+| P 481 V20 Core
+| Vampire
+|-
+| Lame
+| -3 
+| You can't walk well.
+| P 482 V20 Core
+| Everyone
+|-
+| Lazy
+| -3 
+|
+|
+| Everyone
+|-
+| Light Sensitive
+| -2, -4, -6 
+|
+|
+| Ghoul
+|-
+| Mayfly Curse
+| -5, -10 
+|
+|
+| Mage
+|-
+| Medicated
+| -1, -3, -5 
+|
+|
+| Everyone
+|-
+| Monstrous
+| -3 
+|
+|
+| Vampire
+|-
+| Mute
+| -4 
+|
+|
+| Everyone
+|-
+| One Eye
+| -2 
+|
+|
+| Everyone
+|-
+| Open Wound
+| -2 
+|
+|
+| Vampire
+|-
+| Permanent Fangs
+| -3 
+|
+|
+| Vampire
+|-
+| Permanent Wound
+| -3 
+|
+|
+| Vampire
+|-
+| Profiled Appearance
+| -2 
+|
+|
+| Everyone
+|-
+| Repulsive Feature
+| -2 
+|
+|
+| Everyone
+|-
+| Short
+| -1 
+|
+|
+| Everyone
+|-
+| Slow Healing
+| -3 
+|
+|
+| Vampire
+|-
+| Smell of the Grave
+| -1 
+|
+|
+| Vampire
+|-
+| Teetotaler
+| -1 
+|
+|
+| Everyone
+|-
+| Thin Blood
+| -4 
+|
+|
+| Vampire
+|-
+| Twitch
+| -1 
+|
+|
+| Everyone
+|}
+
+== Mental Flaws ==
+{| class="wikitable sortable"
+! Name
+! Point value
+! Description
+! Page Reference
+! Available To
+|- 
+| Absent-Minded
+| -3 
+|
+|
+| Everyone
+|-
+| Amnesia
+| -2 
+|
+|
+| Everyone
+|-
+| Anachronism
+| -2 
+|
+|
+| Vampire
+|-
+| Attention Deficit Disorder
+| -2 
+|
+|
+| Everyone
+|-
+| Berserker / Stress Atavism
+| -4 
+|
+|
+| Mage
+|-
+| Bigot
+| -3 
+|
+|
+| Everyone
+|-
+| Bound
+| -2 
+|
+|
+| Vampire
+|-
+| Chronic Depression
+| -3 
+|
+|
+| Everyone
+|-
+| Compulsion
+| -1 
+|
+|
+| Everyone
+|-
+| Conspicuous Consumption
+| -4 
+|
+|
+| Vampire
+|-
+| Curiosity
+| -2 
+|
+|
+| Everyone
+|-
+| Deep Sleeper
+| -1 
+|
+|
+| Vampire
+|-
+| Extreme Kink
+| -3, -5
+|
+|
+| Everyone
+|-
+| Flashbacks
+| -3, -6
+|
+|
+| Mage, Vampire
+|-
+| Guilt Wracked
+| -4 
+|
+|
+| Vampire
+|-
+| Hatred
+| -3 
+|
+|
+| Everyone
+|-
+| Hero Worship
+| -1 
+|
+|
+| Everyone
+|-
+| Icy
+| -2 
+|
+|
+| Everyone
+|-
+| Impatient
+| -1 
+|
+|
+| Everyone
+|-
+| Intemperate
+| -2 
+|
+|
+| Everyone
+|-
+| Lifesaver
+| -3 
+|
+|
+| Everyone
+|-
+| Lunacy
+| -2 
+|
+|
+| Vampire
+|-
+| Mental Lock
+| -1 
+|
+|
+| Everyone
+|-
+| Nightmares
+| -1 
+|
+|
+| Everyone
+|-
+| OCPD
+| -3 
+|
+|
+| Everyone
+|-
+| Overconfident
+| -1 
+|
+|
+| Everyone
+|-
+| Phobia
+| -2 
+|
+|
+| Everyone
+|-
+| Prey Exclusion
+| -1 
+|
+|
+| Vampire
+|-
+| PTSD
+| -2, -3, -4, -5
+|
+|
+| Everyone
+|-
+| Rose-Colored Glasses
+| -2 
+|
+|
+| Everyone
+|-
+| Short Fuse
+| -2 
+|
+|
+| Vampire
+|-
+| Shy
+| -1 
+|
+|
+| Everyone
+|-
+| Soft Hearted
+| -1 
+|
+|
+| Vampire
+|-
+| Speech Impediment
+| -1 
+|
+|
+| Everyone
+|-
+| Stereotype
+| -2 
+|
+|
+| Vampire
+|-
+| Territorial
+| -2 
+|
+|
+| Vampire
+|-
+| Thirst for Innocence
+| -2 
+|
+|
+| Vampire
+|-
+| Uncontrollable
+| -5 
+|
+|
+| Brujah
+|-
+| Unconvinced
+| -1 
+|
+|
+| Vampire
+|-
+| Vanilla
+| -1 
+|
+|
+| Everyone
+|-
+| Vengeful
+| -2 
+|
+|
+| Everyone
+|-
+| Victim of the Masquerade
+| -2 
+|
+|
+| Vampire
+|-
+| Weak Willed
+| -3 
+|
+|
+| Everyone
+|-
+| Whimsy
+| -1 
+|
+|
+| Everyone
+|}
+
+== Social Flaws ==
+{| class="wikitable sortable"
+! Name
+! Point Value
+! Short Description
+! Page Reference
+! Available To
+|-
+| Botched Presentation
+| -1 
+|
+|
+| Vampire
+|-
+| Catspaw
+| -2 
+|
+|
+| Vampire
+|-
+| Construct
+| -2 
+|
+|
+| Mage
+|-
+| Coward Of King's County
+| -2 
+|
+|
+| Vampire
+|-
+| Diabolical Mentor
+| -2 
+|
+|
+| Mage
+|-
+| Diabolic Sire
+| -2 
+|
+|
+| Vampire
+|-
+| Disgrace to the Blood
+| -3 
+|
+|
+| Vampire
+|-
+| Failure
+| -2 
+|
+|
+| Vampire
+|-
+| Former Prince
+| -3 
+|
+|
+| Vampire
+|-
+| Hunted
+| -4 
+|
+|
+| Vampire
+|-
+| Hunted Like A Dog
+| -3 
+|
+|
+| Vampire
+|-
+| Incomplete Understanding
+| -1 
+|
+|
+| Vampire
+|-
+| Infamous Sire
+| -1 
+|
+|
+| Vampire
+|-
+| Insane / Infamous Mentor
+| -1 
+|
+|
+| Mage
+|-
+| Insane Sire
+| -1 
+|
+|
+| Vampire
+|-
+| Laughingstock
+| -5 
+|
+|
+| Vampire
+|-
+| Major Boon
+| -4 
+|
+|
+| Vampire
+|-
+| Masquerade Breaker
+| -2 
+|
+|
+| Vampire
+|-
+| Minor Boon
+| -2 
+|
+|
+| Vampire
+|-
+| Narc
+| -3 
+|
+|
+| Vampire
+|-
+| New Kid
+| -1 
+|
+|
+| Vampire
+|-
+| Obvious Predator
+| -2 
+|
+|
+| Brujah
+|-
+| Outcast
+| -1 
+|
+|
+| Assamite
+|-
+| Pawn To A Paw
+| -2 
+|
+|
+| Vampire
+|-
+| Probationary Sect Member
+| -4 
+|
+|
+| Vampire
+|-
+| Recruitment Target
+| -1 
+|
+|
+| Vampire
+|-
+| Resentful Sire
+| -1 
+|
+|
+| Vampire
+|-
+| Rival House
+| -1 to -5
+|
+|
+| Mage
+|-
+| Rival Sires
+| -2 
+|
+|
+| Vampire
+|-
+| Rogue
+| -4 
+|
+|
+| Mage
+|-
+| Rotten Liar
+| -3 
+|
+|
+| Mage
+|-
+| Special Responsibility
+| -1 
+|
+|
+| Vampire
+|-
+| Sympathizer
+| -1 
+|
+|
+| Vampire
+|-
+| Trivial Boon
+| -1 
+|
+|
+| Vampire
+|-
+| Twisted Apprenticeship
+| -1 
+|
+|
+| Mage
+|-
+| Witch-Hunted
+| -4 
+|
+|
+| Mage
+|}
+
+== Supernatural Flaws ==
+{| class="wikitable sortable"
+! Name
+! Point Value
+! Short Description
+! Page Reference
+! Available To
+|-
+| Anachronism
+| -1, -3 
+|
+|
+| Mage
+|-
+| Ancestral Soil Dependence
+| -2 
+|
+|
+| Tzimisce
+|-
+| Anosmia
+| -2 
+|
+|
+| Nosferatu
+|-
+| Aura of the Typhon
+| -5 
+|
+|
+| Undead
+|-
+| Beacon of the Unholy
+| -2 
+|
+|
+| Vampire
+|-
+| Beast Within
+| -5 
+|
+|
+| Mage
+|-
+| Bedeviled
+| -6 
+|
+|
+| Mage
+|-
+| Bestial
+| -3 
+|
+|
+| Nosferatu
+|-
+| Bizarre Hunger
+| -1 to -5
+|
+|
+| Mage
+|-
+| Blood-Hungry Soul
+| -2, -3, -5
+|
+|
+| Mage
+|-
+| Blood Magick
+| -5 
+|
+|
+| Mage
+|-
+| Bound to the Clan
+| -3 
+|
+|
+| Tremere
+|-
+| Branded
+| -5 
+|
+|
+| Mage
+|-
+| Branded
+| -3 
+|
+|
+| Mage
+|-
+| Brittle Body
+| -2, -4
+|
+|
+| Vampire
+|-
+| Broken Antitribu
+| -3 
+|
+|
+| Assamite
+|-
+| Bulimia
+| -4 
+|
+|
+| Clanless
+|-
+| Can't Cross Running Water
+| -3 
+|
+|
+| Vampire
+|-
+| Cast No Reflection
+| -1 
+|
+|
+| Vampire
+|-
+| Cast No Shadow / Reflection
+| -1, -2 
+|
+|
+| Mage
+|-
+| Chandala
+| -1 
+|
+|
+| Ravnos
+|-
+| Cloistered
+| -2 
+|
+|
+| Tremere
+|-
+| Cold Breeze
+| -1 
+|
+|
+| Vampire
+|-
+| Contagious
+| -5 
+|
+|
+| Nosferatu
+|-
+| Count Von Count
+| -3 
+|
+|
+| Vampire
+|-
+| Crucial Component
+| -1 to -5 
+|
+|
+| Mage
+|-
+| Dead Inside
+| -4 
+|
+|
+| Malkavian
+|-
+| Deathsight
+| -2 
+|
+|
+| Vampire
+|-
+| Death's Reflection
+| -3 
+|
+|
+| Lasombra
+|-
+| Devil's Mark
+| -1 
+|
+|
+| Mage
+|-
+| Echoes
+| -1 to -5
+|
+|
+| Mage
+|-
+| Eerie Presence
+| -2 
+|
+|
+| Vampire
+|-
+| Enemy Brood
+| -3 
+|
+|
+| Nosferatu
+|-
+| Faceless
+| -3 
+|
+|
+| Tzimisce
+|-
+| Faithless
+| -5 
+|
+|
+| Mage
+|-
+| Fangless
+| -2 
+|
+|
+| Vampire
+|-
+| Faulty Enhancements
+| -2 to -5 
+|
+|
+| Mage
+|-
+| Flawed Reality
+| -2 
+|
+|
+| Ravnos
+|-
+| Forked Tongue
+| -2 
+|
+|
+| Follower of Set
+|-
+| Foul Blood
+| -1 
+|
+|
+| Nosferatu
+|-
+| Gremlin
+| -1 to -5 
+|
+|
+| Mage
+|-
+| Grip of the Damned
+| -4 
+|
+|
+| Vampire
+|-
+| Heartless
+| -4 
+|
+|
+| Follower of Set
+|-
+| Ignorance
+| -2 
+|
+|
+| Clanless
+|-
+| Inbred
+| -1 to -5 
+|
+|
+| Giovanni
+|-
+| Incoherent
+| -5 
+|
+|
+| Nosferatu
+|-
+| Infectious
+| -3 
+|
+|
+| Malkavian
+|-
+| Infertile Vitae
+| -3, -5 
+|
+|
+| Vampire
+|-
+| Insubordinate
+| -3 
+|
+|
+| Lasombra
+|-
+| Invite Me In
+| -3 
+|
+|
+| Vampire
+|-
+| Jinx / Infernal Contraption
+| -2, -4, -6, -8, -10 
+|
+|
+| Mage
+|-
+| Light Sensitive
+| -5 
+|
+|
+| Vampire
+|-
+| Lightweight
+| -1 
+|
+|
+| Vampire
+|-
+| Locked Vidare
+| -1 
+|
+|
+| Mage
+|-
+| Lord of the Flies
+| -2 
+|
+|
+| Vampire
+|-
+| Lost Svadharma
+| -3 
+|
+|
+| Ravnos
+|-
+| Mage Blood
+| -5 
+|
+|
+| Tremere
+|-
+| Mortal Flashbacks
+| -5 
+|
+|
+| Vampire
+|-
+| Multiple Curses
+| -3 
+|
+|
+| Assamite
+|-
+| Oathbreaker
+| -2 
+|
+|
+| Ravnos
+|-
+| Outcast
+| -2 
+|
+|
+| Assamite
+|-
+| Overstimulated
+| -3 
+|
+|
+| Malkavian
+|-
+| Paper Trail
+| -2 
+|
+|
+| Malkavian
+|-
+| Paralyzed by Drowning
+| -3 
+|
+|
+| Vampire
+|-
+| Parasitic Infestation
+| -2 
+|
+|
+| Nosferatu
+|-
+| Permanent Paradox Flaw
+| -2, -4, -6
+|
+|
+| Mage
+|-
+| Permanent Third Eye
+| -2, -4
+|
+|
+| Salubri
+|-
+| Phylactery
+| -7 
+|
+|
+| Mage
+|-
+| Primal Marks
+| -3 
+|
+|
+| Mage
+|-
+| Private Life
+| -3 
+|
+|
+| Toreador
+|-
+| Prone to Quiet
+| -4, -5 
+|
+|
+| Mage
+|-
+| Putrescent
+| -4 
+|
+|
+| Nosferatu
+|-
+| Rat in a Cage
+| -2 
+|
+|
+| Gangrel
+|-
+| Repelled by Crosses
+| -3 
+|
+|
+| Vampire
+|-
+| Repulsed by Garlic
+| -1 
+|
+|
+| Vampire
+|-
+| Repulsed by Hawthorn
+| -1 
+|
+|
+| Vampire
+|-
+| Repulsed by Holly
+| -1 
+|
+|
+| Vampire
+|-
+| Repulsed by Oak
+| -1 
+|
+|
+| Vampire
+|-
+| Repulsed by Roses
+| -1 
+|
+|
+| Vampire
+|-
+| Scales
+| -1 to -3
+|
+|
+| Follower of Set
+|-
+| Shadow Scarred
+| -3 
+|
+|
+| Cappadocian
+|-
+| Shadow Walker
+| -6 
+|
+|
+| Giovanni
+|-
+| Stench
+| -1 
+|
+|
+| Nosferatu
+|-
+| Stigmata
+| -2, -4
+|
+|
+| Malkavian
+|-
+| Strangeness
+| -1 
+|
+|
+| Mage
+|-
+| Taint of Corruption
+| -7 
+|
+|
+| Mage
+|-
+| Thaumaturgically Inept
+| -5 
+|
+|
+| Tremere
+|-
+| Throwback
+| -1 to -5 
+|
+|
+| Mage
+|-
+| Throwback
+| -5 
+|
+|
+| Mage
+|-
+| Throwback
+| -4 
+|
+|
+| Mage
+|-
+| Throwback
+| -1 
+|
+|
+| Mage
+|-
+| Throwback
+| -3 
+|
+|
+| Mage
+|-
+| Tortured Artist
+| -1 
+|
+|
+| Toreador
+|-
+| Touch of Frost
+| -1 
+|
+|
+| Vampire
+|-
+| Unblinking
+| -1 
+|
+|
+| Tzimisce
+|-
+| Uncommon Vitae Preference
+| -2 
+|
+|
+| Ventrue
+|-
+| Uncontrollable Night Sight
+| -2 
+|
+|
+| Lasombra
+|-
+| Unproven
+| -3 
+|
+|
+| Lasombra
+|-
+| Unsanctioned Embrace
+| -2 
+|
+|
+| Harbinger of Skulls
+|-
+| Unsettling Effect
+| -1, -3
+|
+|
+| Human
+|-
+| Venomous Bite
+| -2 
+|
+|
+| Follower of Set
+|-
+| Vulnerable to Silver
+| -2 
+|
+|
+| Vampire
+|}

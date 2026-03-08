@@ -6,10 +6,12 @@ import {
   applyGenerationDerived,
   computeFreebieBudget,
   computeFreebieSpent,
+  getLayer,
   getStepForPath,
   isPatchAllowed,
   loadDictionaries,
   recalcFlawFreebie,
+  setLayer,
   rollbackFreebies,
   WIZARD_STEPS,
   validateRanges
@@ -134,6 +136,12 @@ export function registerSocket(io: Server) {
               callback(reject("Недопустимая база", patch.path));
               return;
             }
+          }
+
+          const container = character.traits?.[group as keyof typeof character.traits];
+          if (container) {
+            const current = getLayer(container, key);
+            setLayer(container, key, current);
           }
         }
 

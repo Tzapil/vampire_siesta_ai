@@ -268,9 +268,56 @@ button:disabled {
   border-radius: 12px;
   padding: 12px 16px;
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(240px, 1fr);
+  grid-template-columns: minmax(0, 1.4fr) minmax(240px, 1fr);
   gap: 16px;
   align-items: center;
+}
+
+.sheet-header-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.sheet-avatar-frame {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 14px;
+  border: 1px solid #22324d;
+  background: #0c1524;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.sheet-avatar-frame.empty button.secondary {
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.sheet-avatar-frame img {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  object-fit: cover;
+  border: none;
+}
+
+.sheet-header-text {
+  min-width: 200px;
+}
+
+.avatar-edit {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 14px;
+  background: rgba(12, 21, 36, 0.85);
 }
 
 .sheet-title {
@@ -340,6 +387,32 @@ button:disabled {
   gap: 12px;
 }
 
+.sheet-col-log {
+  max-width: 320px;
+}
+
+.log-panel {
+  position: sticky;
+  top: 12px;
+}
+
+.log-panel.collapsed .log-list {
+  display: none;
+}
+
+.log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.log-toggle {
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+}
+
 .sheet-col {
   display: grid;
   gap: 12px;
@@ -399,6 +472,138 @@ button:disabled {
   background: #0c1524;
   border: 1px solid #1b2a44;
   font-size: 12px;
+}
+
+.trait-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.dice-roller {
+  display: grid;
+  gap: 10px;
+}
+
+.dice-inputs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.dice-field {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: #9bb0cf;
+}
+
+.dice-field input {
+  width: 90px;
+}
+
+.dice-result {
+  display: grid;
+  gap: 8px;
+}
+
+.dice-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dice-die {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid #22324d;
+  background: #0c1524;
+  font-weight: 700;
+  font-size: 12px;
+  color: #c7d7f1;
+}
+
+.dice-die.success {
+  color: #9bf2c2;
+  border-color: #2d6a4f;
+  background: rgba(45, 106, 79, 0.18);
+}
+
+.dice-die.fail {
+  color: #ffb3b3;
+  border-color: #7b2d2d;
+  background: rgba(123, 45, 45, 0.2);
+}
+
+.dice-die.one {
+  box-shadow: 0 0 0 1px #ff6b6b inset;
+}
+
+.dice-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: #c7d7f1;
+  align-items: center;
+}
+
+.dice-status {
+  font-weight: 700;
+}
+
+.dice-result.success .dice-status {
+  color: #8ff0b0;
+}
+
+.dice-result.failure .dice-status {
+  color: #f2a9a9;
+}
+
+.dice-result.botch .dice-status {
+  color: #ff6b6b;
+}
+
+.log-list {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.log-item {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #0c1524;
+  border: 1px solid #1b2a44;
+  font-size: 12px;
+}
+
+.log-time {
+  font-size: 10px;
+  color: #8fa6c8;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.log-message {
+  color: #d8e6ff;
+  line-height: 1.35;
+}
+
+.log-empty {
+  font-size: 12px;
+  color: #9bb0cf;
+  padding: 4px 0;
 }
 
 .sheet .dots {

@@ -28,6 +28,7 @@ export const BASE_VIRTUES_EXTRA = 7;
 
 export const FREEBIE_BASE = 15;
 export const FLAW_FREEBIE_CAP = 7;
+const MAX_AVATAR_LENGTH = 3_000_000;
 
 export const FREEBIE_COST = {
   attribute: 5,
@@ -257,6 +258,12 @@ export function validateRanges(
   }
   if (typeof character.equipment !== "string") {
     errors.push({ path: "equipment", message: "Поле снаряжения должно быть строкой" });
+  }
+  if (character.meta?.avatarUrl != null && typeof character.meta.avatarUrl !== "string") {
+    errors.push({ path: "meta.avatarUrl", message: "Картинка должна быть строкой" });
+  }
+  if (typeof character.meta?.avatarUrl === "string" && character.meta.avatarUrl.length > MAX_AVATAR_LENGTH) {
+    errors.push({ path: "meta.avatarUrl", message: "Картинка слишком большая" });
   }
 
   return errors;
@@ -717,7 +724,8 @@ export function isPatchAllowed(path: string, creationFinished: boolean) {
     /^traits\.(attributes|abilities|disciplines|backgrounds|virtues)\.[^.]+\.storyteller$/,
     /^meta\.clanKey$/,
     /^meta\.chronicleId$/,
-    /^meta\.generation$/
+    /^meta\.generation$/,
+    /^meta\.avatarUrl$/
   ];
 
   const list = creationFinished ? gameAllowed : wizardAllowed;

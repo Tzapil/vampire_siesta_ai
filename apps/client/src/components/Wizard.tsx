@@ -237,6 +237,59 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
   const sumMeritCost = (keys: string[]) => keys.reduce((sum, key) => sum + meritCostFor(key), 0);
   const sumFlawCost = (keys: string[]) => keys.reduce((sum, key) => sum + flawCostFor(key), 0);
 
+  const buildTooltip = (...parts: Array<string | undefined | null>) => {
+    const text = parts
+      .map((part) => (part ?? "").trim())
+      .filter(Boolean)
+      .join("\n");
+    return text.length > 0 ? text : null;
+  };
+
+  const renderHelpIcon = (text?: string | null) =>
+    text ? (
+      <span className="help-icon" title={text} aria-label={text}>
+        ?
+      </span>
+    ) : null;
+
+  const formatSpecialization = (at?: number, text?: string) => {
+    if (!text) return undefined;
+    const prefix = at ? `Специализация (от ${at}): ` : "Специализация: ";
+    return `${prefix}${text}`;
+  };
+
+  const disciplineCategoryLabel = (category?: string) => {
+    if (!category) return undefined;
+    const map: Record<string, string> = {
+      physical: "Физическая",
+      mental: "Ментальная",
+      unique: "Уникальная"
+    };
+    return map[category] ?? category;
+  };
+
+  const attributeTooltip = (attr: AttributeDto) =>
+    buildTooltip(
+      attr.description,
+      formatSpecialization(attr.specializationAt, attr.specializationDescription),
+      attr.pageRef ? `Источник: ${attr.pageRef}` : undefined
+    );
+
+  const abilityTooltip = (ability: AbilityDto) =>
+    buildTooltip(
+      ability.description,
+      formatSpecialization(ability.specializationAt, ability.specializationDescription),
+      ability.pageRef ? `Источник: ${ability.pageRef}` : undefined
+    );
+
+  const disciplineTooltip = (disc: DictItem) => {
+    const category = disciplineCategoryLabel(disc.category);
+    return buildTooltip(
+      disc.description,
+      category ? `Категория: ${category}` : undefined
+    );
+  };
+
   const priorities = character.creation?.attributesPriority;
   const abilityPriorities = character.creation?.abilitiesPriority;
   const attrPriorities = {
@@ -566,6 +619,7 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
       const isAppearance = attr.key === "appearance" && appearanceFixed;
       const rank = attrPriorities[attr.group];
       const budgetLabel = rank ? ATTR_BUDGET[rank] : null;
+      const tooltip = attributeTooltip(attr);
       const error = errorForPaths([
         `traits.attributes.${attr.key}.base`,
         `traits.attributes.${attr.key}`
@@ -573,7 +627,10 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
       return (
         <div key={attr.key} className="wizard-attr-item">
           <div className={`wizard-attr-row ${isAppearance ? "disabled" : ""}`}>
-            <span>{attr.labelRu}</span>
+            <span className="wizard-attr-label">
+              <span>{attr.labelRu}</span>
+              {renderHelpIcon(tooltip)}
+            </span>
             <DotsInput
               value={isAppearance ? 0 : value}
               min={minBaseForAttribute(attr.key)}
@@ -763,6 +820,7 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
 
     const renderAbilityItem = (ability: AbilityDto) => {
       const layer = character.traits.abilities[ability.key];
+      const tooltip = abilityTooltip(ability);
       const error = errorForPaths([
         `traits.abilities.${ability.key}.base`,
         `traits.abilities.${ability.key}`
@@ -770,7 +828,10 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
       return (
         <div key={ability.key} className="wizard-attr-item">
           <div className="wizard-attr-row">
-            <span>{ability.labelRu}</span>
+            <span className="wizard-attr-label">
+              <span>{ability.labelRu}</span>
+              {renderHelpIcon(tooltip)}
+            </span>
             <DotsInput
               value={layer?.base ?? 0}
               min={0}
@@ -971,6 +1032,7 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
               )}
               {allowedDisciplines.map((disc) => {
                 const layer = character.traits.disciplines[disc.key];
+                const tooltip = disciplineTooltip(disc);
                 const error = errorForPaths([
                   `traits.disciplines.${disc.key}.base`,
                   `traits.disciplines.${disc.key}`
@@ -978,7 +1040,10 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                 return (
                   <div key={disc.key} className="wizard-attr-item">
                     <div className="wizard-attr-row">
-                      <span>{disc.labelRu}</span>
+                      <span className="wizard-attr-label">
+                        <span>{disc.labelRu}</span>
+                        {renderHelpIcon(tooltip)}
+                      </span>
                       <DotsInput
                         value={layer?.base ?? 0}
                         min={0}
@@ -1314,6 +1379,7 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                   const safeBase = isAppearance ? 0 : baseValue;
                   const freebieValue = character.traits.attributes[attr.key]?.freebie ?? 0;
                   const totalValue = safeBase + freebieValue;
+                  const tooltip = attributeTooltip(attr);
                   const error = errorForPaths([
                     `traits.attributes.${attr.key}.freebie`,
                     `traits.attributes.${attr.key}`
@@ -1321,7 +1387,10 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                   return (
                     <div key={attr.key} className="wizard-attr-item">
                       <div className={`wizard-attr-row ${isAppearance ? "disabled" : ""}`}>
-                        <span>{attr.labelRu}</span>
+                        <span className="wizard-attr-label">
+                          <span>{attr.labelRu}</span>
+                          {renderHelpIcon(tooltip)}
+                        </span>
                       <DotsInput
                         value={isAppearance ? 0 : totalValue}
                         min={safeBase}
@@ -1355,6 +1424,7 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                     const baseValue = character.traits.disciplines[disc.key]?.base ?? 0;
                     const freebieValue = character.traits.disciplines[disc.key]?.freebie ?? 0;
                     const totalValue = baseValue + freebieValue;
+                    const tooltip = disciplineTooltip(disc);
                     const error = errorForPaths([
                       `traits.disciplines.${disc.key}.freebie`,
                       `traits.disciplines.${disc.key}`
@@ -1362,7 +1432,10 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                     return (
                       <div key={disc.key} className="wizard-attr-item">
                         <div className="wizard-attr-row">
-                          <span>{disc.labelRu}</span>
+                          <span className="wizard-attr-label">
+                            <span>{disc.labelRu}</span>
+                            {renderHelpIcon(tooltip)}
+                          </span>
                       <DotsInput
                         value={totalValue}
                         min={baseValue}
@@ -1449,6 +1522,7 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                   const baseValue = character.traits.abilities[ability.key]?.base ?? 0;
                   const freebieValue = character.traits.abilities[ability.key]?.freebie ?? 0;
                   const totalValue = baseValue + freebieValue;
+                  const tooltip = abilityTooltip(ability);
                   const error = errorForPaths([
                     `traits.abilities.${ability.key}.freebie`,
                     `traits.abilities.${ability.key}`
@@ -1456,7 +1530,10 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                   return (
                     <div key={ability.key} className="wizard-attr-item">
                       <div className="wizard-attr-row">
-                        <span>{ability.labelRu}</span>
+                        <span className="wizard-attr-label">
+                          <span>{ability.labelRu}</span>
+                          {renderHelpIcon(tooltip)}
+                        </span>
                         <DotsInput
                           value={totalValue}
                           min={baseValue}

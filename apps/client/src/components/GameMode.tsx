@@ -1,6 +1,8 @@
-import { useMemo } from "react";
-import type { CharacterDto, DictItem, LayeredValue } from "../api/types";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { api } from "../api/client";
+import type { CharacterDto, ChronicleLogDto, DictItem, LayeredValue } from "../api/types";
 import { useDictionaries } from "../context/DictionariesContext";
+import { useToast } from "../context/ToastContext";
 import { HealthTrack } from "./HealthTrack";
 
 function NumericControl({
@@ -89,7 +91,10 @@ export function GameMode({
   onPatch: (path: string, value: unknown) => void;
 }) {
   const { dictionaries } = useDictionaries();
+  const { pushToast } = useToast();
   const maxBlood = character.derived?.bloodPoolMax ?? 0;
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const avatarUrl = character.meta.avatarUrl?.trim();
 
   const resources = character.resources;
 
@@ -97,6 +102,137 @@ export function GameMode({
   const totalDamage = health.bashing + health.lethal + health.aggravated;
   const totalFor = (layer?: LayeredValue) =>
     layer ? layer.base + layer.freebie + layer.storyteller : 0;
+  const buildTooltip = (...parts: Array<string | undefined | null>) => {
+    const text = parts
+      .map((part) => (part ?? "").trim())
+      .filter(Boolean)
+      .join("\n");
+    return text.length > 0 ? text : null;
+  };
+  const renderHelpIcon = (text?: string | null) =>
+    text ? (
+      <span className="help-icon" title={text} aria-label={text}>
+        ?
+      </span>
+    ) : null;
+
+  const clampNumber = (value: number, min: number, max: number) =>
+    Math.max(min, Math.min(max, value));
+
+  const [diceDifficulty, setDiceDifficulty] = useState(6);
+  const [diceCount, setDiceCount] = useState(6);
+  const [chronicleLogs, setChronicleLogs] = useState<ChronicleLogDto[]>([]);
+  const [logOpen, setLogOpen] = useState(true);
+  const [rollResult, setRollResult] = useState<{
+    values: number[];
+    successes: number;
+    ones: number;
+    net: number;
+    status: "success" | "failure" | "botch";
+  } | null>(null);
+
+  useEffect(() => {
+    const chronicleId = character.meta.chronicleId;
+    if (!chronicleId) {
+      setChronicleLogs([]);
+      return;
+    }
+    let active = true;
+    async function loadLogs() {
+      try {
+        const logs = await api.get<ChronicleLogDto[]>(`/chronicles/${chronicleId}/logs?limit=50`);
+        if (active) {
+          setChronicleLogs(logs);
+        }
+      } catch {
+        if (active) setChronicleLogs([]);
+      }
+    }
+    loadLogs();
+    return () => {
+      active = false;
+    };
+  }, [character.meta.chronicleId]);
+
+  const handleRollDice = () => {
+    const difficulty = clampNumber(diceDifficulty, 1, 10);
+    const count = clampNumber(diceCount, 1, 20);
+    setDiceDifficulty(difficulty);
+    setDiceCount(count);
+
+    const values = Array.from({ length: count }, () => 1 + Math.floor(Math.random() * 10));
+    const successes = values.filter((value) => value >= difficulty).length;
+    const ones = values.filter((value) => value === 1).length;
+    const net = successes - ones;
+
+    let status: "success" | "failure" | "botch" = "failure";
+    if (net > 0) {
+      status = "success";
+    } else if (successes === 0 && ones > 0) {
+      status = "botch";
+    }
+
+    const result = { values, successes, ones, net, status };
+    setRollResult(result);
+
+    const chronicleId = character.meta.chronicleId;
+    if (chronicleId) {
+      const characterName = character.meta.name?.trim() || "(Без имени)";
+      const playerName = character.meta.playerName?.trim() || "Неизвестный игрок";
+      const statusLabel =
+        status === "success" ? "успех" : status === "botch" ? "критический провал" : "провал";
+      const message = `Игрок ${playerName}, персонаж ${characterName}, бросил проверку сложности ${difficulty} на ${count} куб(ов): ${statusLabel}, успехов ${Math.max(
+        net,
+        0
+      )}.`;
+
+      api
+        .post<ChronicleLogDto>(`/chronicles/${chronicleId}/logs`, {
+          type: "dice_roll",
+          message,
+          data: {
+            playerName,
+            characterName,
+            characterUuid: character.uuid,
+            difficulty,
+            diceCount: count,
+            values,
+            successes,
+            ones,
+            net,
+            status
+          }
+        })
+        .then((entry) => {
+          setChronicleLogs((prev) => [entry, ...prev].slice(0, 50));
+        })
+        .catch(() => {
+          pushToast("Не удалось записать бросок в лог", "error");
+        });
+    }
+  };
+
+  const handleAvatarFile = async (file?: File | null) => {
+    if (!file) return;
+    const maxBytes = 2_000_000;
+    if (file.size > maxBytes) {
+      pushToast("Файл слишком большой (макс. 2 МБ)", "error");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      if (!result) {
+        pushToast("Не удалось прочитать файл", "error");
+        return;
+      }
+      onPatch("meta.avatarUrl", result);
+    };
+    reader.onerror = () => {
+      pushToast("Не удалось прочитать файл", "error");
+    };
+    reader.readAsDataURL(file);
+  };
 
   const renderTraitList = (
     title: string,
@@ -168,14 +304,53 @@ export function GameMode({
     <section className="page sheet">
       <div className="sheet-header">
         <div className="sheet-header-left">
-          <div className="sheet-title">{character.meta.name || "(Без имени)"}</div>
-          <div className="sheet-subtitle">
-            {clanLabel} · {sectLabel} · Поколение {character.meta.generation}
-          </div>
-          <div className="sheet-meta">
-            <span>Игрок: {character.meta.playerName || "—"}</span>
-            <span>Натура: {natureLabel}</span>
-            <span>Поведение: {demeanorLabel}</span>
+          <div className="sheet-header-main">
+            <div className={`sheet-avatar-frame ${avatarUrl ? "has-image" : "empty"}`}>
+              {avatarUrl ? (
+                <>
+                  <img src={avatarUrl} alt={character.meta.name || "Аватар"} />
+                  <button
+                    type="button"
+                    className="icon-button avatar-edit"
+                    title="Изменить картинку"
+                    aria-label="Изменить картинку"
+                    onClick={() => avatarInputRef.current?.click()}
+                  >
+                    🖼️
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => avatarInputRef.current?.click()}
+                >
+                  Загрузить картинку
+                </button>
+              )}
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  handleAvatarFile(file);
+                  event.target.value = "";
+                }}
+              />
+            </div>
+            <div className="sheet-header-text">
+              <div className="sheet-title">{character.meta.name || "(Без имени)"}</div>
+              <div className="sheet-subtitle">
+                {clanLabel} · {sectLabel} · Поколение {character.meta.generation}
+              </div>
+              <div className="sheet-meta">
+                <span>Игрок: {character.meta.playerName || "—"}</span>
+                <span>Натура: {natureLabel}</span>
+                <span>Поведение: {demeanorLabel}</span>
+              </div>
+            </div>
           </div>
         </div>
         <div className="sheet-header-right">
@@ -245,9 +420,13 @@ export function GameMode({
                 {character.traits.merits.length === 0 && <div className="trait-empty">Нет</div>}
                 {character.traits.merits.map((key) => {
                   const merit = dictionaries.merits.find((item) => item.key === key);
+                  const tooltip = buildTooltip(merit?.description);
                   return (
                     <div key={key} className="trait-row">
-                      <span>{merit?.labelRu ?? key}</span>
+                      <span className="trait-label">
+                        <span>{merit?.labelRu ?? key}</span>
+                        {renderHelpIcon(tooltip)}
+                      </span>
                       <span className="trait-cost">{merit?.pointCost ?? "—"}</span>
                     </div>
                   );
@@ -260,9 +439,13 @@ export function GameMode({
                 {character.traits.flaws.length === 0 && <div className="trait-empty">Нет</div>}
                 {character.traits.flaws.map((key) => {
                   const flaw = dictionaries.flaws.find((item) => item.key === key);
+                  const tooltip = buildTooltip(flaw?.description);
                   return (
                     <div key={key} className="trait-row">
-                      <span>{flaw?.labelRu ?? key}</span>
+                      <span className="trait-label">
+                        <span>{flaw?.labelRu ?? key}</span>
+                        {renderHelpIcon(tooltip)}
+                      </span>
                       <span className="trait-cost">{flaw?.pointCost ?? "—"}</span>
                     </div>
                   );
@@ -273,6 +456,73 @@ export function GameMode({
         </div>
 
         <div className="sheet-col">
+          <div className="sheet-card">
+            <div className="sheet-card-header">Бросок кубиков</div>
+            <div className="dice-roller">
+              <div className="dice-inputs">
+                <label className="dice-field">
+                  <span>Сложность</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={diceDifficulty}
+                    onChange={(event) =>
+                      setDiceDifficulty(
+                        clampNumber(Number(event.target.value || 0), 1, 10)
+                      )
+                    }
+                  />
+                </label>
+                <label className="dice-field">
+                  <span>Кубиков</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={diceCount}
+                    onChange={(event) =>
+                      setDiceCount(clampNumber(Number(event.target.value || 0), 1, 20))
+                    }
+                  />
+                </label>
+                <button type="button" className="primary" onClick={handleRollDice}>
+                  Бросить
+                </button>
+              </div>
+              {rollResult && (
+                <div className={`dice-result ${rollResult.status}`}>
+                  <div className="dice-values">
+                    {rollResult.values.map((value, index) => {
+                      const isSuccess = value >= diceDifficulty;
+                      const isOne = value === 1;
+                      return (
+                        <span
+                          key={`${value}-${index}`}
+                          className={`dice-die ${isSuccess ? "success" : "fail"} ${
+                            isOne ? "one" : ""
+                          }`}
+                        >
+                          {value}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <div className="dice-summary">
+                    <span>Успехи: {Math.max(0, rollResult.net)}</span>
+                    <span>Единицы: {rollResult.ones}</span>
+                    <span className="dice-status">
+                      {rollResult.status === "success"
+                        ? "Успех"
+                        : rollResult.status === "botch"
+                          ? "Критический провал"
+                          : "Провал"}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
           <div className="sheet-card compact-controls">
             <div className="sheet-card-header">Ресурсы</div>
             <div className="compact-controls-grid">
@@ -366,6 +616,36 @@ export function GameMode({
               value={character.equipment}
               onChange={(event) => onPatch("equipment", event.target.value)}
             />
+          </div>
+        </div>
+
+        <div className="sheet-col sheet-col-log">
+          <div className={`sheet-card log-panel ${logOpen ? "" : "collapsed"}`}>
+            <div className="sheet-card-header log-header">
+              <span>Лог хроники</span>
+              <button
+                type="button"
+                className="icon-button log-toggle"
+                aria-expanded={logOpen}
+                title={logOpen ? "Свернуть" : "Развернуть"}
+                onClick={() => setLogOpen((prev) => !prev)}
+              >
+                {logOpen ? "▾" : "▸"}
+              </button>
+            </div>
+            <div className="log-list">
+              {chronicleLogs.length === 0 && (
+                <div className="log-empty">Нет событий.</div>
+              )}
+              {chronicleLogs.map((log) => (
+                <div key={log._id} className="log-item">
+                  <div className="log-time">
+                    {new Date(log.createdAt).toLocaleString("ru-RU")}
+                  </div>
+                  <div className="log-message">{log.message}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
