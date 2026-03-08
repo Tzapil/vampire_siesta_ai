@@ -7,6 +7,7 @@ import type {
   ChronicleLogDto,
   CharacterSummaryDto
 } from "../api/types";
+import { useDictionaries } from "../context/DictionariesContext";
 import { useToast } from "../context/ToastContext";
 
 export default function ChroniclePage() {
@@ -18,6 +19,7 @@ export default function ChroniclePage() {
   const [selectedImage, setSelectedImage] = useState<ChronicleImageDto | null>(null);
   const [loading, setLoading] = useState(true);
   const { pushToast } = useToast();
+  const { dictionaries } = useDictionaries();
   const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -213,15 +215,48 @@ export default function ChroniclePage() {
       <h1>{chronicle.name}</h1>
       <div className="card">
         <div className="section-title">Персонажи</div>
-        <div className="list">
+        <div className="chronicle-character-grid">
           {characters.map((character) => {
             const name = character.meta?.name?.trim() || "(Без имени)";
+            const avatarUrl = character.meta?.avatarUrl?.trim();
+            const fallbackLetter =
+              name && name !== "(Без имени)" ? name.trim().charAt(0).toUpperCase() : "—";
+            const playerName = character.meta?.playerName?.trim() || "—";
+            const clanLabel =
+              dictionaries.clans.find((item) => item.key === character.meta?.clanKey)?.labelRu ||
+              "—";
+            const sectLabel =
+              dictionaries.sects.find((item) => item.key === character.meta?.sectKey)?.labelRu ||
+              "";
+            const generation =
+              typeof character.meta?.generation === "number" ? character.meta.generation : null;
             return (
-              <Link key={character.uuid} to={`/c/${character.uuid}`} className="list-item">
-                <span>
-                  {name}
-                  {!character.creationFinished && <span className="tag">Черновик ✦</span>}
-                </span>
+              <Link key={character.uuid} to={`/c/${character.uuid}`} className="character-card">
+                <div className="character-card-header">
+                  {avatarUrl ? (
+                    <img
+                      className="character-avatar"
+                      src={avatarUrl}
+                      alt={name}
+                    />
+                  ) : (
+                    <span className="character-avatar placeholder">{fallbackLetter}</span>
+                  )}
+                  <div className="character-card-title">
+                    <div className="character-card-name">
+                      {name}
+                      {!character.creationFinished && <span className="tag">Черновик ✦</span>}
+                    </div>
+                    <div className="character-card-sub">
+                      {clanLabel}
+                      {sectLabel ? ` · ${sectLabel}` : ""}
+                    </div>
+                  </div>
+                </div>
+                <div className="character-card-meta">
+                  <span>Игрок: {playerName}</span>
+                  {generation !== null && <span>Поколение: {generation}</span>}
+                </div>
               </Link>
             );
           })}

@@ -67,7 +67,15 @@ export type ChronicleImageDto = {
 export type CharacterSummaryDto = {
   uuid: string;
   creationFinished: boolean;
-  meta: { name: string; chronicleId: string };
+  meta: {
+    name: string;
+    chronicleId: string;
+    avatarUrl?: string;
+    playerName?: string;
+    clanKey?: string;
+    sectKey?: string;
+    generation?: number;
+  };
 };
 
 export type LayeredValue = {

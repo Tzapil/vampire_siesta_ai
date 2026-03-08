@@ -103,6 +103,8 @@ export function GameMode({
     status: "success" | "failure" | "botch";
   } | null>(null);
   const [initiativeResult, setInitiativeResult] = useState<number | null>(null);
+  const [selectedAttributeKey, setSelectedAttributeKey] = useState<string | null>(null);
+  const [selectedAbilityKey, setSelectedAbilityKey] = useState<string | null>(null);
 
   const handleRollInitiative = () => {
     const dexterity = totalFor(character.traits.attributes["dexterity"]);
@@ -178,6 +180,19 @@ export function GameMode({
       active = false;
     };
   }, [character.meta.chronicleId]);
+
+  useEffect(() => {
+    if (!selectedAttributeKey || !selectedAbilityKey) return;
+    const attrTotal = totalFor(character.traits.attributes[selectedAttributeKey]);
+    const abilityTotal = totalFor(character.traits.abilities[selectedAbilityKey]);
+    const next = clampNumber(attrTotal + abilityTotal, 1, 20);
+    setDiceCount(next);
+  }, [
+    selectedAttributeKey,
+    selectedAbilityKey,
+    character.traits.attributes,
+    character.traits.abilities
+  ]);
 
   const handleRollDice = () => {
     const difficulty = clampNumber(diceDifficulty, 1, 10);
@@ -465,7 +480,12 @@ export function GameMode({
     items: DictItem[],
     record: Record<string, LayeredValue>,
     columns = false,
-    options?: { hideZero?: boolean }
+    options?: {
+      hideZero?: boolean;
+      selectable?: boolean;
+      selectedKey?: string | null;
+      onSelect?: (key: string) => void;
+    }
   ) => {
     const filtered = options?.hideZero
       ? items.filter((item) => totalFor(record[item.key]) > 0)
@@ -477,8 +497,32 @@ export function GameMode({
           {filtered.length === 0 && <div className="trait-empty">Нет</div>}
           {filtered.map((item) => {
             const total = totalFor(record[item.key]);
+            const selectable = Boolean(options?.onSelect);
+            const isSelected = options?.selectedKey === item.key;
             return (
-              <div key={item.key} className="trait-row">
+              <div
+                key={item.key}
+                className={`trait-row${selectable ? " selectable" : ""}${
+                  isSelected ? " selected" : ""
+                }`}
+                onClick={
+                  selectable
+                    ? () => options?.onSelect?.(item.key)
+                    : undefined
+                }
+                role={selectable ? "button" : undefined}
+                tabIndex={selectable ? 0 : undefined}
+                onKeyDown={
+                  selectable
+                    ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          options?.onSelect?.(item.key);
+                        }
+                      }
+                    : undefined
+                }
+              >
                 <span>{item.labelRu}</span>
                 <DotsDisplay total={total} />
               </div>
@@ -498,6 +542,12 @@ export function GameMode({
   const demeanorLabel =
     dictionaries.demeanors.find((item) => item.key === character.meta.demeanorKey)?.labelRu || "—";
   const chronicleName = chronicle?.name?.trim() || "—";
+  const selectedAttributeLabel = selectedAttributeKey
+    ? dictionaries.attributes.find((item) => item.key === selectedAttributeKey)?.labelRu
+    : null;
+  const selectedAbilityLabel = selectedAbilityKey
+    ? dictionaries.abilities.find((item) => item.key === selectedAbilityKey)?.labelRu
+    : null;
 
   const clampHealth = (next: { bashing: number; lethal: number; aggravated: number }) => {
     const bashing = Math.max(0, Math.min(7, next.bashing));
@@ -704,8 +754,18 @@ export function GameMode({
         <div className="sheet-col">
           <div className="sheet-card">
             <div className="sheet-card-header">Характеристики</div>
-            {renderTraitList("Атрибуты", dictionaries.attributes, character.traits.attributes, true)}
-            {renderTraitList("Способности", dictionaries.abilities, character.traits.abilities, true)}
+            {renderTraitList("Атрибуты", dictionaries.attributes, character.traits.attributes, true, {
+              selectable: true,
+              selectedKey: selectedAttributeKey,
+              onSelect: (key) =>
+                setSelectedAttributeKey((prev) => (prev === key ? null : key))
+            })}
+            {renderTraitList("Способности", dictionaries.abilities, character.traits.abilities, true, {
+              selectable: true,
+              selectedKey: selectedAbilityKey,
+              onSelect: (key) =>
+                setSelectedAbilityKey((prev) => (prev === key ? null : key))
+            })}
           </div>
         </div>
 
@@ -812,6 +872,16 @@ export function GameMode({
                   >
                     🎲
                   </button>
+                </div>
+                <div className="dice-selection">
+                  {selectedAttributeLabel && selectedAbilityLabel ? (
+                    <>
+                      Выбор: <strong>{selectedAttributeLabel}</strong> +{" "}
+                      <strong>{selectedAbilityLabel}</strong>
+                    </>
+                  ) : (
+                    "Кликните по атрибуту и способности, чтобы подставить кубики"
+                  )}
                 </div>
                 {rollResult && (
                   <div className={`dice-result ${rollResult.status}`}>

@@ -32,7 +32,9 @@ router.get(
       "meta.chronicleId": req.params.id,
       deleted: false
     })
-      .select("uuid meta.name creationFinished meta.chronicleId")
+      .select(
+        "uuid meta.name meta.avatarUrl meta.playerName meta.clanKey meta.sectKey meta.generation creationFinished meta.chronicleId"
+      )
       .lean();
 
     const sorted = characters.sort((a, b) => {
