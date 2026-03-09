@@ -1,5 +1,11 @@
 ﻿import { Router } from "express";
-import { ChronicleImageModel, ChronicleLogModel, ChronicleModel, CharacterModel } from "../db";
+import {
+  ChronicleImageModel,
+  ChronicleLogModel,
+  ChronicleModel,
+  CharacterModel,
+  CombatStateModel
+} from "../db";
 import { asyncHandler } from "../utils/asyncHandler";
 
 const router = Router();
@@ -8,8 +14,30 @@ const MAX_CHRONICLE_IMAGE_LENGTH = 7_000_000;
 router.get(
   "/chronicles",
   asyncHandler(async (_req, res) => {
-    const items = await ChronicleModel.find().lean();
+    const items = await ChronicleModel.find({ deleted: { $ne: true } }).lean();
     res.json(items);
+  })
+);
+
+router.post(
+  "/chronicles",
+  asyncHandler(async (req, res) => {
+    const { name, description } = req.body ?? {};
+    if (!name || typeof name !== "string" || name.trim().length === 0) {
+      res.status(400).json({ message: "Название хроники обязательно" });
+      return;
+    }
+
+    const trimmedName = name.trim().slice(0, 80);
+    const trimmedDescription =
+      typeof description === "string" ? description.trim().slice(0, 1000) : "";
+
+    const chronicle = await ChronicleModel.create({
+      name: trimmedName,
+      description: trimmedDescription
+    });
+
+    res.status(201).json(chronicle);
   })
 );
 
@@ -25,6 +53,22 @@ router.get(
   })
 );
 
+router.post(
+  "/chronicles/:id/delete",
+  asyncHandler(async (req, res) => {
+    const chronicle = await ChronicleModel.findByIdAndUpdate(
+      req.params.id,
+      { $set: { deleted: true } },
+      { new: true }
+    ).lean();
+    if (!chronicle) {
+      res.status(404).json({ message: "Хроника не найдена" });
+      return;
+    }
+    res.json(chronicle);
+  })
+);
+
 router.get(
   "/chronicles/:id/characters",
   asyncHandler(async (req, res) => {
@@ -33,7 +77,7 @@ router.get(
       deleted: false
     })
       .select(
-        "uuid meta.name meta.avatarUrl meta.playerName meta.clanKey meta.sectKey meta.generation creationFinished meta.chronicleId"
+        "uuid meta.name meta.avatarUrl meta.playerName meta.clanKey meta.sectKey meta.generation creationFinished meta.chronicleId traits.attributes resources.health"
       )
       .lean();
 
@@ -154,6 +198,156 @@ router.delete(
       return;
     }
     res.status(204).end();
+  })
+);
+
+router.get(
+  "/chronicles/:id/combat",
+  asyncHandler(async (req, res) => {
+    const chronicleExists = await ChronicleModel.exists({ _id: req.params.id });
+    if (!chronicleExists) {
+      res.status(404).json({ message: "Хроника не найдена" });
+      return;
+    }
+    const found = await CombatStateModel.findOne({ chronicleId: req.params.id });
+    const combat = found ?? (await CombatStateModel.create({ chronicleId: req.params.id }));
+    res.json(combat.toObject({ flattenMaps: true }));
+  })
+);
+
+router.post(
+  "/chronicles/:id/combat/start",
+  asyncHandler(async (req, res) => {
+    const chronicleExists = await ChronicleModel.exists({ _id: req.params.id });
+    if (!chronicleExists) {
+      res.status(404).json({ message: "Хроника не найдена" });
+      return;
+    }
+    const previous = await CombatStateModel.findOne({ chronicleId: req.params.id }).lean();
+    const wasActive = Boolean(previous?.active);
+    const combat = await CombatStateModel.findOneAndUpdate(
+      { chronicleId: req.params.id },
+      { $set: { active: true, initiatives: {}, enemies: [] } },
+      { new: true, upsert: true }
+    );
+    if (!wasActive) {
+      await ChronicleLogModel.create({
+        chronicleId: req.params.id,
+        type: "combat_start",
+        message: "Бой начался"
+      });
+    }
+    res.json(combat?.toObject({ flattenMaps: true }) ?? { ok: true });
+  })
+);
+
+router.post(
+  "/chronicles/:id/combat/initiative",
+  asyncHandler(async (req, res) => {
+    const { characterUuid, initiative } = req.body ?? {};
+    if (!characterUuid || typeof characterUuid !== "string") {
+      res.status(400).json({ message: "characterUuid обязателен" });
+      return;
+    }
+    if (!initiative || typeof initiative !== "object") {
+      res.status(400).json({ message: "initiative обязателен" });
+      return;
+    }
+    const combat = await CombatStateModel.findOneAndUpdate(
+      { chronicleId: req.params.id },
+      { $set: { [`initiatives.${characterUuid}`]: initiative } },
+      { new: true, upsert: true }
+    );
+    const plain = combat?.toObject({ flattenMaps: true });
+    res.json({
+      characterUuid,
+      initiative: (plain as any)?.initiatives?.[characterUuid] ?? initiative
+    });
+  })
+);
+
+router.post(
+  "/chronicles/:id/combat/enemies",
+  asyncHandler(async (req, res) => {
+    const { name, dexterity, wits } = req.body ?? {};
+    if (!name || typeof name !== "string") {
+      res.status(400).json({ message: "Имя обязательно" });
+      return;
+    }
+    const safeName = name.trim().slice(0, 80);
+    const dex = Number(dexterity ?? 0);
+    const wit = Number(wits ?? 0);
+    const combat = await CombatStateModel.findOneAndUpdate(
+      { chronicleId: req.params.id },
+      {
+        $push: {
+          enemies: {
+            name: safeName,
+            dexterity: Number.isFinite(dex) ? dex : 0,
+            wits: Number.isFinite(wit) ? wit : 0,
+            health: { bashing: 0, lethal: 0, aggravated: 0 },
+            dead: false
+          }
+        }
+      },
+      { new: true, upsert: true }
+    ).lean();
+    const enemy = (combat as any)?.enemies?.[(combat as any)?.enemies?.length - 1];
+    res.status(201).json(enemy);
+  })
+);
+
+router.patch(
+  "/chronicles/:id/combat/enemies/:enemyId",
+  asyncHandler(async (req, res) => {
+    const { health, dead, initiative, name } = req.body ?? {};
+    const updates: Record<string, unknown> = {};
+    if (health && typeof health === "object") {
+      updates["enemies.$.health"] = health;
+    }
+    if (typeof dead === "boolean") {
+      updates["enemies.$.dead"] = dead;
+    }
+    if (initiative && typeof initiative === "object") {
+      updates["enemies.$.initiative"] = initiative;
+    }
+    if (typeof name === "string" && name.trim().length > 0) {
+      updates["enemies.$.name"] = name.trim().slice(0, 80);
+    }
+    if (Object.keys(updates).length === 0) {
+      res.status(400).json({ message: "Нет данных для обновления" });
+      return;
+    }
+    const combat = await CombatStateModel.findOneAndUpdate(
+      { chronicleId: req.params.id, "enemies._id": req.params.enemyId },
+      { $set: updates },
+      { new: true }
+    ).lean();
+    const enemy = (combat as any)?.enemies?.find(
+      (item: any) => String(item._id) === String(req.params.enemyId)
+    );
+    if (!enemy) {
+      res.status(404).json({ message: "Противник не найден" });
+      return;
+    }
+    res.json(enemy);
+  })
+);
+
+router.delete(
+  "/chronicles/:id/combat",
+  asyncHandler(async (req, res) => {
+    await CombatStateModel.findOneAndUpdate(
+      { chronicleId: req.params.id },
+      { $set: { initiatives: {}, enemies: [], active: false } },
+      { upsert: true }
+    );
+    await ChronicleLogModel.create({
+      chronicleId: req.params.id,
+      type: "combat_end",
+      message: "Бой окончился"
+    });
+    res.json({ ok: true });
   })
 );
 

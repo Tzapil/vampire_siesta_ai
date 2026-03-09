@@ -1,6 +1,7 @@
 export { ChronicleModel } from "./models/Chronicle";
 export { ChronicleImageModel } from "./models/ChronicleImage";
 export { ChronicleLogModel } from "./models/ChronicleLog";
+export { CombatStateModel } from "./models/CombatState";
 export { GenerationModel } from "./models/Generation";
 export { ClanModel } from "./models/Clan";
 export { AttributeModel } from "./models/Attribute";

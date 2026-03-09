@@ -65,6 +65,63 @@ a {
   gap: 16px;
 }
 
+.home-page {
+  gap: 20px;
+}
+
+.home-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  border: 1px solid #1b2a44;
+  background:
+    radial-gradient(600px 300px at 10% -40%, rgba(58, 132, 255, 0.18), transparent 60%),
+    radial-gradient(400px 220px at 90% -30%, rgba(45, 212, 191, 0.12), transparent 60%),
+    #0f1a2b;
+}
+
+.home-hero-main h1 {
+  margin: 0;
+}
+
+.home-subtitle {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #9bb0cf;
+  max-width: 520px;
+}
+
+.home-actions {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.home-card .card-header {
+  margin-bottom: 4px;
+}
+
+.home-list .list-item {
+  gap: 12px;
+}
+
+.home-empty {
+  font-size: 12px;
+  color: #9bb0cf;
+  padding: 6px 2px;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .page-actions {
   display: flex;
   gap: 12px;
@@ -197,8 +254,23 @@ a {
   border: 1px solid #2d6a4f;
 }
 
-.page-links a {
+.page-footer {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #1b2a44;
+  display: flex;
+  justify-content: flex-end;
+  font-size: 12px;
+  color: #9bb0cf;
+}
+
+.page-footer a {
   text-decoration: underline;
+  color: #d8e6ff;
+}
+
+.page-footer a:hover {
+  color: #ffffff;
 }
 
 button {
@@ -439,6 +511,45 @@ button:disabled {
   display: none;
 }
 
+.collapsible-card.collapsed .collapsible-content {
+  display: none;
+}
+
+.collapsible-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.collapsible-toggle {
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+}
+
+.rule-block {
+  display: grid;
+  gap: 10px;
+  font-size: 12px;
+  color: #c7d7f1;
+}
+
+.rule-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.rule-subtitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8fa6c8;
+  font-weight: 600;
+}
+
 .log-header {
   display: flex;
   align-items: center;
@@ -488,6 +599,14 @@ button:disabled {
   font-size: 12px;
   font-weight: 600;
   color: #c7d7f1;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.trait-subtitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8fa6c8;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -1203,6 +1322,10 @@ button:disabled {
   gap: 6px;
 }
 
+.health-track.readonly .health-cell {
+  cursor: default;
+}
+
 .health-cell {
   width: 24px;
   height: 24px;
@@ -1227,6 +1350,140 @@ button:disabled {
 .health-cell.aggravated {
   background: #4a1f1f;
   color: #fff;
+}
+
+.health-action-mini.danger {
+  background: #3a1822;
+  border: 1px solid #7b2d3c;
+  color: #ffd6dd;
+}
+
+.health-action-mini.danger:hover {
+  border-color: #c24a63;
+  background: #4a1f2b;
+}
+
+.combat-add {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.combat-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.combat-entry {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #1b2a44;
+  background: #0c1524;
+}
+
+.combat-entry.dead {
+  opacity: 0.6;
+}
+
+.combat-entry-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.combat-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  border: 1px solid #22324d;
+  background: #101a2b;
+  object-fit: cover;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #9bb0cf;
+}
+
+.combat-avatar.placeholder {
+  font-weight: 700;
+}
+
+.combat-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.combat-link:hover {
+  text-decoration: underline;
+}
+
+.combat-entry-title {
+  display: grid;
+  gap: 4px;
+}
+
+.combat-entry-name {
+  font-weight: 700;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.combat-entry-sub {
+  font-size: 12px;
+  color: #9bb0cf;
+}
+
+.combat-entry-actions {
+  display: grid;
+  grid-template-columns: minmax(160px, 200px) 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.combat-initiative {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+.combat-initiative-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.combat-initiative-meta {
+  font-size: 11px;
+  color: #9bb0cf;
+}
+
+.combat-health {
+  display: grid;
+  gap: 6px;
+}
+
+.combat-enemy-health {
+  display: grid;
+  gap: 6px;
+}
+
+.combat-enemy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.combat-empty {
+  font-size: 12px;
+  color: #9bb0cf;
+  padding: 4px 0;
 }
 
 .list {
@@ -1434,6 +1691,19 @@ button:disabled {
   font-weight: 700;
 }
 
+.chronicle-description {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: #c7d7f1;
+  line-height: 1.5;
+}
+
+.chronicle-combat-status {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #9bb0cf;
+}
+
 .step-counter {
   font-size: 13px;
   color: #9bb0cf;
@@ -1442,6 +1712,11 @@ button:disabled {
 @media (max-width: 720px) {
   .app-main {
     padding: 16px;
+  }
+
+  .home-hero {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .toast-viewport {
@@ -1465,6 +1740,10 @@ button:disabled {
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
+  }
+
+  .combat-entry-actions {
+    grid-template-columns: 1fr;
   }
 }
 

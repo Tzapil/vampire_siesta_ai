@@ -45,6 +45,7 @@ export type ChronicleDto = {
   _id: string;
   name: string;
   description?: string;
+  deleted?: boolean;
 };
 
 export type ChronicleLogDto = {
@@ -76,6 +77,38 @@ export type CharacterSummaryDto = {
     sectKey?: string;
     generation?: number;
   };
+  traits?: {
+    attributes?: Record<string, LayeredValue>;
+  };
+  resources?: {
+    health?: { bashing: number; lethal: number; aggravated: number };
+  };
+};
+
+export type CombatInitiativeDto = {
+  dexterity: number;
+  wits: number;
+  base: number;
+  roll: number;
+  total: number;
+};
+
+export type CombatEnemyDto = {
+  _id: string;
+  name: string;
+  dexterity: number;
+  wits: number;
+  health: { bashing: number; lethal: number; aggravated: number };
+  dead: boolean;
+  initiative?: CombatInitiativeDto;
+};
+
+export type CombatStateDto = {
+  _id: string;
+  chronicleId: string;
+  initiatives: Record<string, CombatInitiativeDto>;
+  enemies: CombatEnemyDto[];
+  active: boolean;
 };
 
 export type LayeredValue = {

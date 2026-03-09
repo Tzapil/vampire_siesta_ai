@@ -31,9 +31,20 @@ function buildLayeredRecord(keys: string[], base: number) {
 router.post(
   "/characters",
   asyncHandler(async (_req, res) => {
-    let chronicle = await ChronicleModel.findOne({ name: "Без хроники" });
-    if (!chronicle) {
-      chronicle = await ChronicleModel.create({ name: "Без хроники" });
+    const requestedChronicleId =
+      typeof _req.body?.chronicleId === "string" ? _req.body.chronicleId.trim() : "";
+    let chronicle = null;
+    if (requestedChronicleId) {
+      chronicle = await ChronicleModel.findById(requestedChronicleId);
+      if (!chronicle) {
+        res.status(404).json({ message: "Хроника не найдена" });
+        return;
+      }
+    } else {
+      chronicle = await ChronicleModel.findOne({ name: "Без хроники" });
+      if (!chronicle) {
+        chronicle = await ChronicleModel.create({ name: "Без хроники" });
+      }
     }
 
     const [attributes, abilities, disciplines, backgrounds, virtues] =

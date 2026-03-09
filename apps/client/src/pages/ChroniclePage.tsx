@@ -1,22 +1,26 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+﻿import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type {
+  CharacterDto,
   ChronicleDto,
   ChronicleImageDto,
   ChronicleLogDto,
-  CharacterSummaryDto
+  CharacterSummaryDto,
+  CombatStateDto
 } from "../api/types";
 import { useDictionaries } from "../context/DictionariesContext";
 import { useToast } from "../context/ToastContext";
 
 export default function ChroniclePage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [chronicle, setChronicle] = useState<ChronicleDto | null>(null);
   const [characters, setCharacters] = useState<CharacterSummaryDto[]>([]);
   const [logs, setLogs] = useState<ChronicleLogDto[]>([]);
   const [images, setImages] = useState<ChronicleImageDto[]>([]);
   const [selectedImage, setSelectedImage] = useState<ChronicleImageDto | null>(null);
+  const [combat, setCombat] = useState<CombatStateDto | null>(null);
   const [loading, setLoading] = useState(true);
   const { pushToast } = useToast();
   const { dictionaries } = useDictionaries();
@@ -27,11 +31,12 @@ export default function ChroniclePage() {
     let active = true;
     async function load() {
       try {
-        const [chronicleData, charactersData, logsData, imagesData] = await Promise.all([
+        const [chronicleData, charactersData, logsData, imagesData, combatData] = await Promise.all([
           api.get<ChronicleDto>(`/chronicles/${id}`),
           api.get<CharacterSummaryDto[]>(`/chronicles/${id}/characters`),
           api.get<ChronicleLogDto[]>(`/chronicles/${id}/logs?limit=50`),
-          api.get<ChronicleImageDto[]>(`/chronicles/${id}/images`)
+          api.get<ChronicleImageDto[]>(`/chronicles/${id}/images`),
+          api.get<CombatStateDto>(`/chronicles/${id}/combat`)
         ]);
         if (!active) return;
         setChronicle(chronicleData);
@@ -44,6 +49,7 @@ export default function ChroniclePage() {
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
         setImages(sortedImages);
+        setCombat(combatData);
       } catch (err: any) {
         pushToast(err?.message ?? "Не удалось загрузить хронику", "error");
       } finally {
@@ -210,9 +216,91 @@ export default function ChroniclePage() {
     }
   };
 
+  
+  const handleDeleteChronicle = async () => {
+    if (!chronicle) return;
+    const confirmDelete = window.confirm("Удалить хронику? Она исчезнет с главной страницы.");
+    if (!confirmDelete) return;
+    try {
+      await api.post(`/chronicles/${chronicle._id}/delete`);
+      pushToast("Хроника удалена", "success");
+      navigate("/");
+    } catch (err: any) {
+      pushToast(err?.message ?? "Не удалось удалить хронику", "error");
+    }
+  };
+
   return (
     <section className="page">
       <h1>{chronicle.name}</h1>
+      {chronicle.description?.trim() && (
+        <div className="card">
+          <div className="section-title">Описание</div>
+          <p className="chronicle-description">{chronicle.description}</p>
+        </div>
+      )}
+      <div className="card">
+        <div className="card-header">
+          <div className="section-title">Инструменты хроники</div>
+          <div className="page-actions header-actions">
+            <button
+              type="button"
+              className="icon-button"
+              title="Создать персонажа"
+              aria-label="Создать персонажа"
+              onClick={async () => {
+                try {
+                  const character = await api.post<CharacterDto>("/characters", {
+                    chronicleId: chronicle._id
+                  });
+                  navigate(`/c/${character.uuid}`);
+                } catch (err: any) {
+                  pushToast(err?.message ?? "Не удалось создать персонажа", "error");
+                }
+              }}
+            >
+              ➕
+            </button>
+            <button
+              type="button"
+              className="icon-button"
+              title={combat?.active ? "Перейти к бою" : "Начать бой"}
+              aria-label={combat?.active ? "Перейти к бою" : "Начать бой"}
+              onClick={async () => {
+                if (combat?.active) {
+                  navigate(`/chronicles/${chronicle._id}/combat`);
+                  return;
+                }
+                try {
+                  const started = await api.post<CombatStateDto>(
+                    `/chronicles/${chronicle._id}/combat/start`
+                  );
+                  setCombat(started);
+                  navigate(`/chronicles/${chronicle._id}/combat`);
+                } catch (err: any) {
+                  pushToast(err?.message ?? "Не удалось начать бой", "error");
+                }
+              }}
+            >
+              ⚔️
+            </button>
+            <button
+              type="button"
+              className="icon-button danger"
+              title="Удалить хронику"
+              aria-label="Удалить хронику"
+              onClick={handleDeleteChronicle}
+            >
+              {"\uD83D\uDDD1"}
+            </button>
+          </div>
+        </div>
+        {combat && (
+          <div className="chronicle-combat-status">
+            {combat.active ? "Бой активен" : "Бой не начат"}
+          </div>
+        )}
+      </div>
       <div className="card">
         <div className="section-title">Персонажи</div>
         <div className="chronicle-character-grid">
@@ -365,3 +453,11 @@ export default function ChroniclePage() {
     </section>
   );
 }
+
+
+
+
+
+
+
+

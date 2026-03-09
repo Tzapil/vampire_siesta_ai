@@ -1,4 +1,6 @@
+﻿
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type {
   CharacterDto,
@@ -10,7 +12,6 @@ import type {
 import { useDictionaries } from "../context/DictionariesContext";
 import { useToast } from "../context/ToastContext";
 import { HealthTrack } from "./HealthTrack";
-import { Link } from "react-router-dom";
 
 function HealthAdjustButton({
   label,
@@ -30,18 +31,13 @@ function HealthAdjustButton({
   );
 }
 
-function DotsDisplay({
-  total,
-  max = 5
-}: {
-  total: number;
-  max?: number;
-}) {
+function DotsDisplay({ total, max = 5 }: { total: number; max?: number }) {
+  const safeTotal = Math.min(Math.max(total, 0), max);
   const dots = Array.from({ length: max });
   return (
-    <div className="dots readonly" aria-label={`${total} из ${max}`}>
+    <div className="dots readonly" aria-label={`${safeTotal} из ${max}`}>
       {dots.map((_, index) => {
-        const filled = index < total;
+        const filled = index < safeTotal;
         return (
           <div
             key={index}
@@ -63,18 +59,21 @@ export function GameMode({
 }) {
   const { dictionaries } = useDictionaries();
   const { pushToast } = useToast();
-  const maxBlood = character.derived?.bloodPoolMax ?? 0;
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const diceAnimTimeoutRef = useRef<number | null>(null);
   const initiativeAnimTimeoutRef = useRef<number | null>(null);
-  const avatarUrl = character.meta.avatarUrl?.trim();
 
+  const maxBlood = character.derived?.bloodPoolMax ?? 0;
   const resources = character.resources;
-
   const health = useMemo(() => resources.health, [resources.health]);
   const totalDamage = health.bashing + health.lethal + health.aggravated;
+
   const totalFor = (layer?: LayeredValue) =>
     layer ? layer.base + layer.freebie + layer.storyteller : 0;
+
+  const clampNumber = (value: number, min: number, max: number) =>
+    Math.max(min, Math.min(max, value));
+
   const buildTooltip = (...parts: Array<string | undefined | null>) => {
     const text = parts
       .map((part) => (part ?? "").trim())
@@ -82,6 +81,7 @@ export function GameMode({
       .join("\n");
     return text.length > 0 ? text : null;
   };
+
   const renderHelpIcon = (text?: string | null) =>
     text ? (
       <span className="help-icon" title={text} aria-label={text}>
@@ -89,14 +89,16 @@ export function GameMode({
       </span>
     ) : null;
 
-  const clampNumber = (value: number, min: number, max: number) =>
-    Math.max(min, Math.min(max, value));
-
   const [diceDifficulty, setDiceDifficulty] = useState(6);
   const [diceCount, setDiceCount] = useState(6);
   const [chronicle, setChronicle] = useState<ChronicleDto | null>(null);
   const [chronicleLogs, setChronicleLogs] = useState<ChronicleLogDto[]>([]);
-  const [logOpen, setLogOpen] = useState(true);
+  const [logOpen, setLogOpen] = useState(false);
+  const [combatRulesOpen, setCombatRulesOpen] = useState(false);
+  const [meleeOpen, setMeleeOpen] = useState(false);
+  const [rangedOpen, setRangedOpen] = useState(false);
+  const [defenseOpen, setDefenseOpen] = useState(false);
+  const [multiOpen, setMultiOpen] = useState(false);
   const [rollResult, setRollResult] = useState<{
     values: number[];
     successes: number;
@@ -110,40 +112,30 @@ export function GameMode({
   const [selectedAttributeKey, setSelectedAttributeKey] = useState<string | null>(null);
   const [selectedAbilityKey, setSelectedAbilityKey] = useState<string | null>(null);
 
-  const handleRollInitiative = () => {
-    if (initiativeAnimTimeoutRef.current) {
-      window.clearTimeout(initiativeAnimTimeoutRef.current);
-    }
-    setInitiativeRolling(false);
-    requestAnimationFrame(() => setInitiativeRolling(true));
-    initiativeAnimTimeoutRef.current = window.setTimeout(() => setInitiativeRolling(false), 600);
+  const selectedAttributeLabel = useMemo(
+    () =>
+      dictionaries.attributes.find((item) => item.key === selectedAttributeKey)?.labelRu ?? null,
+    [dictionaries.attributes, selectedAttributeKey]
+  );
 
-    const dexterity = totalFor(character.traits.attributes["dexterity"]);
-    const wits = totalFor(character.traits.attributes["wits"]);
-    const base = dexterity + wits;
-    const roll = 1 + Math.floor(Math.random() * 10);
-    const total = base + roll;
-    setInitiativeResult(total);
+  const selectedAbilityLabel = useMemo(
+    () =>
+      dictionaries.abilities.find((item) => item.key === selectedAbilityKey)?.labelRu ?? null,
+    [dictionaries.abilities, selectedAbilityKey]
+  );
 
-    const characterName = character.meta.name?.trim() || "(Без имени)";
-    const playerName = character.meta.playerName?.trim() || "Неизвестный игрок";
-    const message = `Игрок ${playerName}, персонаж ${characterName}, бросил инициативу: Ловкость ${dexterity} + Смекалка ${wits} + d10(${roll}) = ${total}.`;
-
-    logChronicleEvent({
-      type: "initiative_roll",
-      message,
-      data: {
-        playerName,
-        characterName,
-        characterUuid: character.uuid,
-        dexterity,
-        wits,
-        base,
-        roll,
-        total
-      }
-    });
-  };
+  useEffect(() => {
+    if (!selectedAttributeKey || !selectedAbilityKey) return;
+    const attrTotal = totalFor(character.traits.attributes[selectedAttributeKey]);
+    const abilityTotal = totalFor(character.traits.abilities[selectedAbilityKey]);
+    const next = clampNumber(attrTotal + abilityTotal, 1, 20);
+    setDiceCount(next);
+  }, [
+    selectedAttributeKey,
+    selectedAbilityKey,
+    character.traits.attributes,
+    character.traits.abilities
+  ]);
 
   useEffect(() => {
     const chronicleId = character.meta.chronicleId;
@@ -157,8 +149,7 @@ export function GameMode({
         const logs = await api.get<ChronicleLogDto[]>(`/chronicles/${chronicleId}/logs?limit=50`);
         if (active) {
           const sorted = [...logs].sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           );
           setChronicleLogs(sorted);
         }
@@ -171,17 +162,6 @@ export function GameMode({
       active = false;
     };
   }, [character.meta.chronicleId]);
-
-  useEffect(() => {
-    return () => {
-      if (diceAnimTimeoutRef.current) {
-        window.clearTimeout(diceAnimTimeoutRef.current);
-      }
-      if (initiativeAnimTimeoutRef.current) {
-        window.clearTimeout(initiativeAnimTimeoutRef.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     const chronicleId = character.meta.chronicleId;
@@ -214,18 +194,26 @@ export function GameMode({
     };
   }, []);
 
-  useEffect(() => {
-    if (!selectedAttributeKey || !selectedAbilityKey) return;
-    const attrTotal = totalFor(character.traits.attributes[selectedAttributeKey]);
-    const abilityTotal = totalFor(character.traits.abilities[selectedAbilityKey]);
-    const next = clampNumber(attrTotal + abilityTotal, 1, 20);
-    setDiceCount(next);
-  }, [
-    selectedAttributeKey,
-    selectedAbilityKey,
-    character.traits.attributes,
-    character.traits.abilities
-  ]);
+  const logChronicleEvent = (payload: {
+    type: string;
+    message: string;
+    data?: Record<string, unknown>;
+  }) => {
+    const chronicleId = character.meta.chronicleId;
+    if (!chronicleId) return;
+    api
+      .post<ChronicleLogDto>(`/chronicles/${chronicleId}/logs`, payload)
+      .then((entry) => {
+        setChronicleLogs((prev) => {
+          const next = [entry, ...prev];
+          next.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          return next.slice(0, 50);
+        });
+      })
+      .catch(() => {
+        pushToast("Не удалось записать событие в лог", "error");
+      });
+  };
 
   const handleRollDice = () => {
     if (diceAnimTimeoutRef.current) {
@@ -282,6 +270,41 @@ export function GameMode({
     });
   };
 
+  const handleRollInitiative = () => {
+    if (initiativeAnimTimeoutRef.current) {
+      window.clearTimeout(initiativeAnimTimeoutRef.current);
+    }
+    setInitiativeRolling(false);
+    requestAnimationFrame(() => setInitiativeRolling(true));
+    initiativeAnimTimeoutRef.current = window.setTimeout(() => setInitiativeRolling(false), 600);
+
+    const dexterity = totalFor(character.traits.attributes["dexterity"]);
+    const wits = totalFor(character.traits.attributes["wits"]);
+    const base = dexterity + wits;
+    const roll = 1 + Math.floor(Math.random() * 10);
+    const total = base + roll;
+    setInitiativeResult(total);
+
+    const characterName = character.meta.name?.trim() || "(Без имени)";
+    const playerName = character.meta.playerName?.trim() || "Неизвестный игрок";
+    const message = `Игрок ${playerName}, персонаж ${characterName}, бросил инициативу: Ловкость ${dexterity} + Смекалка ${wits} + d10(${roll}) = ${total}.`;
+
+    logChronicleEvent({
+      type: "initiative_roll",
+      message,
+      data: {
+        playerName,
+        characterName,
+        characterUuid: character.uuid,
+        dexterity,
+        wits,
+        base,
+        roll,
+        total
+      }
+    });
+  };
+
   const handleAvatarFile = async (file?: File | null) => {
     if (!file) return;
     const maxBytes = 2_000_000;
@@ -302,27 +325,6 @@ export function GameMode({
       pushToast("Не удалось прочитать файл", "error");
     };
     reader.readAsDataURL(file);
-  };
-
-  const logChronicleEvent = (payload: {
-    type: string;
-    message: string;
-    data?: Record<string, unknown>;
-  }) => {
-    const chronicleId = character.meta.chronicleId;
-    if (!chronicleId) return;
-    api
-      .post<ChronicleLogDto>(`/chronicles/${chronicleId}/logs`, payload)
-      .then((entry) => {
-        setChronicleLogs((prev) => {
-          const next = [entry, ...prev];
-          next.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          return next.slice(0, 50);
-        });
-      })
-      .catch(() => {
-        pushToast("Не удалось записать событие в лог", "error");
-      });
   };
 
   const handleHealthChange = (next: { bashing: number; lethal: number; aggravated: number }) => {
@@ -420,6 +422,21 @@ export function GameMode({
     handleResourceChange(resourceKey, next);
   };
 
+  const adjustHealth = (type: "bashing" | "lethal" | "aggravated", delta: number) => {
+    const maxHealth = 7;
+    if (delta > 0 && totalDamage >= maxHealth) return;
+    const allowedDelta = delta > 0 ? Math.min(delta, maxHealth - totalDamage) : delta;
+    const next = {
+      ...health,
+      [type]: clampNumber(health[type] + allowedDelta, 0, maxHealth)
+    };
+    handleHealthChange(next);
+  };
+
+  const healAll = () => {
+    handleHealthChange({ bashing: 0, lethal: 0, aggravated: 0 });
+  };
+
   const renderLogMessage = (log: ChronicleLogDto) => {
     if (log.type === "dice_roll" && log.data) {
       const data = log.data as Record<string, unknown>;
@@ -427,10 +444,7 @@ export function GameMode({
       const characterName = String(data.characterName ?? "Без имени");
       const difficulty = Number(data.difficulty ?? 0);
       const diceCount = Number(data.diceCount ?? 0);
-      const status = String(data.status ?? "failure") as
-        | "success"
-        | "failure"
-        | "botch";
+      const status = String(data.status ?? "failure") as "success" | "failure" | "botch";
       const net = Number(data.net ?? 0);
       const statusLabel =
         status === "success" ? "успех" : status === "botch" ? "критический провал" : "провал";
@@ -464,12 +478,8 @@ export function GameMode({
       return (
         <span className="log-text">
           Игрок <strong>{playerName}</strong>, персонаж <strong>{characterName}</strong>,{" "}
-          <span className={`log-status ${kind}`}>
-            {actionLabel}
-          </span>{" "}
-          типа {typeLabel}:{" "}
-          <span className={`log-amount ${kind}`}>{amount}</span>
-          .
+          <span className={`log-status ${kind}`}>{actionLabel}</span> типа {typeLabel}:{" "}
+          <span className={`log-amount ${kind}`}>{amount}</span>.
         </span>
       );
     }
@@ -518,165 +528,177 @@ export function GameMode({
   const renderTraitList = (
     title: string,
     items: DictItem[],
-    record: Record<string, LayeredValue>,
-    columns = false,
+    values: Record<string, LayeredValue>,
+    grouped: boolean,
     options?: {
-      hideZero?: boolean;
       selectable?: boolean;
       selectedKey?: string | null;
       onSelect?: (key: string) => void;
+      hideZero?: boolean;
+      columns?: boolean;
     }
   ) => {
-    const filtered = options?.hideZero
-      ? items.filter((item) => totalFor(record[item.key]) > 0)
-      : items;
+    const groups = new Map<string, DictItem[]>();
+    if (grouped) {
+      items.forEach((item) => {
+        const groupKey = (item as { group?: string }).group ?? "other";
+        const arr = groups.get(groupKey) ?? [];
+        arr.push(item);
+        groups.set(groupKey, arr);
+      });
+    } else {
+      groups.set("all", items);
+    }
+
+    const groupLabels: Record<string, string> = {
+      physical: "Физические",
+      social: "Социальные",
+      mental: "Ментальные",
+      talents: "Таланты",
+      skills: "Навыки",
+      knowledges: "Знания",
+      other: "Прочее"
+    };
+
+    const order = grouped
+      ? ["physical", "social", "mental", "talents", "skills", "knowledges", "other"].filter((key) =>
+          groups.has(key)
+        )
+      : ["all"];
+
+    const listClass = options?.columns ? "trait-list columns" : "trait-list";
+    const showGroupTitle = grouped && !(order.length === 1 && order[0] === "other");
+
     return (
       <div className="trait-section">
         <div className="trait-title">{title}</div>
-        <div className={columns ? "trait-list columns" : "trait-list"}>
-          {filtered.length === 0 && <div className="trait-empty">Нет</div>}
-          {filtered.map((item) => {
-            const total = totalFor(record[item.key]);
-            const selectable = Boolean(options?.onSelect);
-            const isSelected = options?.selectedKey === item.key;
-            return (
-              <div
-                key={item.key}
-                className={`trait-row${selectable ? " selectable" : ""}${
-                  isSelected ? " selected" : ""
-                }`}
-                onClick={
-                  selectable
-                    ? () => options?.onSelect?.(item.key)
-                    : undefined
-                }
-                role={selectable ? "button" : undefined}
-                tabIndex={selectable ? 0 : undefined}
-                onKeyDown={
-                  selectable
-                    ? (event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          options?.onSelect?.(item.key);
-                        }
+        {order.map((groupKey) => {
+          const groupItems = groups.get(groupKey) ?? [];
+          const visibleItems = groupItems.filter((item) => {
+            const total = totalFor(values[item.key]);
+            return !(options?.hideZero && total === 0);
+          });
+          if (visibleItems.length === 0) return null;
+          return (
+            <div key={groupKey} className="trait-group">
+              {showGroupTitle && (
+                <div className="trait-subtitle">{groupLabels[groupKey] ?? groupKey}</div>
+              )}
+              <div className={listClass}>
+                {visibleItems.map((item) => {
+                  const layer = values[item.key];
+                  const total = totalFor(layer);
+                  const maxDots = typeof item.maxValue === "number" ? item.maxValue : 5;
+                  const tooltip = buildTooltip(
+                    item.description,
+                    (item as { specializationDescription?: string }).specializationDescription,
+                    (item as { pageRef?: string }).pageRef
+                      ? `Стр. ${(item as { pageRef?: string }).pageRef}`
+                      : undefined
+                  );
+                  const selectable = options?.selectable;
+                  const selected = options?.selectedKey === item.key;
+                  const rowClass = [
+                    "trait-row",
+                    selectable ? "selectable" : "",
+                    selected ? "selected" : ""
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+                  return (
+                    <div
+                      key={item.key}
+                      className={rowClass}
+                      onClick={() =>
+                        selectable && options?.onSelect ? options.onSelect(item.key) : null
                       }
-                    : undefined
-                }
-              >
-                <span>{item.labelRu}</span>
-                <DotsDisplay total={total} />
+                      role={selectable ? "button" : undefined}
+                      aria-pressed={selectable ? selected : undefined}
+                    >
+                      <span className="trait-label">
+                        <span>{item.labelRu}</span>
+                        {renderHelpIcon(tooltip)}
+                      </span>
+                      <DotsDisplay total={total} max={maxDots} />
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
       </div>
     );
   };
 
   const clanLabel =
-    dictionaries.clans.find((item) => item.key === character.meta.clanKey)?.labelRu || "—";
+    dictionaries.clans.find((item) => item.key === character.meta.clanKey)?.labelRu ?? "—";
   const sectLabel =
-    dictionaries.sects.find((item) => item.key === character.meta.sectKey)?.labelRu || "—";
+    dictionaries.sects.find((item) => item.key === character.meta.sectKey)?.labelRu ?? "—";
   const natureLabel =
-    dictionaries.natures.find((item) => item.key === character.meta.natureKey)?.labelRu || "—";
+    dictionaries.natures.find((item) => item.key === character.meta.natureKey)?.labelRu ?? "—";
   const demeanorLabel =
-    dictionaries.demeanors.find((item) => item.key === character.meta.demeanorKey)?.labelRu || "—";
-  const chronicleName = chronicle?.name?.trim() || "—";
-  const selectedAttributeLabel = selectedAttributeKey
-    ? dictionaries.attributes.find((item) => item.key === selectedAttributeKey)?.labelRu
-    : null;
-  const selectedAbilityLabel = selectedAbilityKey
-    ? dictionaries.abilities.find((item) => item.key === selectedAbilityKey)?.labelRu
-    : null;
+    dictionaries.demeanors.find((item) => item.key === character.meta.demeanorKey)?.labelRu ?? "—";
+  const chronicleName = chronicle?.name ?? "—";
 
-  const clampHealth = (next: { bashing: number; lethal: number; aggravated: number }) => {
-    const bashing = Math.max(0, Math.min(7, next.bashing));
-    const lethal = Math.max(0, Math.min(7, next.lethal));
-    const aggravated = Math.max(0, Math.min(7, next.aggravated));
-    const total = Math.min(7, bashing + lethal + aggravated);
-    if (total <= 7) {
-      return { bashing, lethal, aggravated };
-    }
-    const overflow = bashing + lethal + aggravated - 7;
-    return {
-      bashing: Math.max(0, bashing - overflow),
-      lethal,
-      aggravated
-    };
-  };
-
-  const adjustHealth = (field: "bashing" | "lethal" | "aggravated", delta: number) => {
-    const next = {
-      ...health,
-      [field]: health[field] + delta
-    } as { bashing: number; lethal: number; aggravated: number };
-    handleHealthChange(clampHealth(next));
-  };
-
-  const healAll = () => {
-    handleHealthChange({ bashing: 0, lethal: 0, aggravated: 0 });
-  };
+  const avatarUrl = character.meta.avatarUrl?.trim();
 
   return (
     <section className="page sheet">
       <div className="sheet-header">
-        <div className="sheet-header-left">
-          <div className="sheet-header-main">
-            <div className={`sheet-avatar-frame ${avatarUrl ? "has-image" : "empty"}`}>
-              {avatarUrl ? (
-                <>
-                  <img src={avatarUrl} alt={character.meta.name || "Аватар"} />
-                  <button
-                    type="button"
-                    className="icon-button avatar-edit"
-                    title="Изменить картинку"
-                    aria-label="Изменить картинку"
-                    onClick={() => avatarInputRef.current?.click()}
-                  >
-                    🖼️
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => avatarInputRef.current?.click()}
-                >
-                  Загрузить картинку
-                </button>
-              )}
-              <input
-                ref={avatarInputRef}
-                type="file"
-                accept="image/*"
-                style={{ display: "none" }}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  handleAvatarFile(file);
-                  event.target.value = "";
-                }}
-              />
+        <div className="sheet-header-main">
+          <div className={`sheet-avatar-frame ${avatarUrl ? "" : "empty"}`}>
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="Аватар" />
+            ) : (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => avatarInputRef.current?.click()}
+              >
+                Загрузить
+              </button>
+            )}
+            <button
+              type="button"
+              className="icon-button avatar-edit"
+              title={avatarUrl ? "Изменить" : "Загрузить"}
+              aria-label={avatarUrl ? "Изменить" : "Загрузить"}
+              onClick={() => avatarInputRef.current?.click()}
+            >
+              ✎
+            </button>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                handleAvatarFile(file);
+                event.target.value = "";
+              }}
+            />
+          </div>
+          <div className="sheet-header-text">
+            <div className="sheet-title">{character.meta.name || "(Без имени)"}</div>
+            <div className="sheet-subtitle">
+              {clanLabel} · {sectLabel} · Поколение {character.meta.generation}
             </div>
-            <div className="sheet-header-text">
-              <div className="sheet-title">{character.meta.name || "(Без имени)"}</div>
-              <div className="sheet-subtitle">
-                {clanLabel} · {sectLabel} · Поколение {character.meta.generation}
-              </div>
-              <div className="sheet-meta">
-                <span>Игрок: {character.meta.playerName || "—"}</span>
-                <span>
-                  Хроника:{" "}
-                  {character.meta.chronicleId ? (
-                    <Link className="inline-link" to={`/chronicles/${character.meta.chronicleId}`}>
-                      {chronicleName}
-                    </Link>
-                  ) : (
-                    "—"
-                  )}
-                </span>
-                <span>Натура: {natureLabel}</span>
-                <span>Поведение: {demeanorLabel}</span>
-              </div>
+            <div className="sheet-meta">
+              <span>Игрок: {character.meta.playerName || "—"}</span>
+              <span>
+                Хроника:{" "}
+                {character.meta.chronicleId ? (
+                  <Link className="inline-link" to={`/chronicles/${character.meta.chronicleId}`}>
+                    {chronicleName}
+                  </Link>
+                ) : (
+                  "—"
+                )}
+              </span>
+              <span>Натура: {natureLabel}</span>
+              <span>Поведение: {demeanorLabel}</span>
             </div>
           </div>
         </div>
@@ -741,12 +763,7 @@ export function GameMode({
               </div>
             </div>
             <div className="stat-pill">
-              <span
-                className="stat-icon"
-                title="Человечность"
-                aria-label="Человечность"
-                role="img"
-              >
+              <span className="stat-icon" title="Человечность" aria-label="Человечность" role="img">
                 😇
               </span>
               <span className="stat-value">
@@ -797,14 +814,14 @@ export function GameMode({
             {renderTraitList("Атрибуты", dictionaries.attributes, character.traits.attributes, true, {
               selectable: true,
               selectedKey: selectedAttributeKey,
-              onSelect: (key) =>
-                setSelectedAttributeKey((prev) => (prev === key ? null : key))
+              onSelect: (key) => setSelectedAttributeKey((prev) => (prev === key ? null : key)),
+              columns: true
             })}
             {renderTraitList("Способности", dictionaries.abilities, character.traits.abilities, true, {
               selectable: true,
               selectedKey: selectedAbilityKey,
-              onSelect: (key) =>
-                setSelectedAbilityKey((prev) => (prev === key ? null : key))
+              onSelect: (key) => setSelectedAbilityKey((prev) => (prev === key ? null : key)),
+              columns: true
             })}
           </div>
         </div>
@@ -812,14 +829,15 @@ export function GameMode({
         <div className="sheet-col">
           <div className="sheet-card">
             <div className="sheet-card-header">Сверхъестественное</div>
+            {renderTraitList("Дисциплины", dictionaries.disciplines, character.traits.disciplines, true, {
+              hideZero: true
+            })}
             {renderTraitList(
-              "Дисциплины",
-              dictionaries.disciplines,
-              character.traits.disciplines,
-              true,
-              { hideZero: true }
+              "Детали биографии",
+              dictionaries.backgrounds,
+              character.traits.backgrounds,
+              true
             )}
-            {renderTraitList("Детали биографии", dictionaries.backgrounds, character.traits.backgrounds, true)}
             {renderTraitList("Добродетели", dictionaries.virtues, character.traits.virtues, true)}
           </div>
           <div className="sheet-card">
@@ -885,9 +903,7 @@ export function GameMode({
                       max={10}
                       value={diceDifficulty}
                       onChange={(event) =>
-                        setDiceDifficulty(
-                          clampNumber(Number(event.target.value || 0), 1, 10)
-                        )
+                        setDiceDifficulty(clampNumber(Number(event.target.value || 0), 1, 10))
                       }
                     />
                   </label>
@@ -932,14 +948,8 @@ export function GameMode({
                         return (
                           <span
                             key={`${value}-${index}`}
-                            className={`dice-die ${isSuccess ? "success" : "fail"} ${
-                              isOne ? "one" : ""
-                            }`}
-                            style={
-                              diceRolling
-                                ? { animationDelay: `${index * 40}ms` }
-                                : undefined
-                            }
+                            className={`dice-die ${isSuccess ? "success" : "fail"} ${isOne ? "one" : ""}`}
+                            style={diceRolling ? { animationDelay: `${index * 40}ms` } : undefined}
                           >
                             {value}
                           </span>
@@ -977,6 +987,7 @@ export function GameMode({
               </div>
             </div>
           </div>
+
           <div className="sheet-card compact-health">
             <div className="sheet-card-header">Здоровье</div>
             <HealthTrack health={health} onChange={handleHealthChange} />
@@ -1044,6 +1055,226 @@ export function GameMode({
               onChange={(event) => onPatch("equipment", event.target.value)}
             />
           </div>
+          <div className={`sheet-card collapsible-card ${combatRulesOpen ? "" : "collapsed"}`}>
+            <div className="sheet-card-header collapsible-header">
+              <span>Бой: фазы</span>
+              <button
+                type="button"
+                className="icon-button collapsible-toggle"
+                aria-expanded={combatRulesOpen}
+                title={combatRulesOpen ? "Свернуть" : "Развернуть"}
+                onClick={() => setCombatRulesOpen((prev) => !prev)}
+              >
+                {combatRulesOpen ? "▾" : "▸"}
+              </button>
+            </div>
+            <div className="collapsible-content rule-block">
+              <ol className="rule-list">
+                <li>Инициатива: Ловкость + Смекалка + d10 (при равенстве сравните базу).</li>
+                <li>Декларация действий: от низкой инициативы к высокой.</li>
+                <li>Разрешение действий: от высокой инициативы к низкой.</li>
+                <li>Атака → защита/уклонение (если доступно) → урон.</li>
+                <li>Урон = база + успехи атаки.</li>
+                <li>
+                  Поглощение (последовательность):
+                  <ul className="rule-list">
+                    <li>Определите тип урона (ударный/летальный/агравированный).</li>
+                    <li>Соберите пул поглощения: Телосложение + броня/снаряжение + дисциплины (если применимо).</li>
+                    <li>Бросьте поглощение, каждый успех снижает урон на 1.</li>
+                    <li>Оставшийся урон отмечается на шкале здоровья.</li>
+                  </ul>
+                </li>
+                <li>Завершите раунд и переходите к следующему.</li>
+              </ol>
+            </div>
+          </div>
+
+          <div className={`sheet-card collapsible-card ${meleeOpen ? "" : "collapsed"}`}>
+            <div className="sheet-card-header collapsible-header">
+              <span>Манёвры: ближний бой</span>
+              <button
+                type="button"
+                className="icon-button collapsible-toggle"
+                aria-expanded={meleeOpen}
+                title={meleeOpen ? "Свернуть" : "Развернуть"}
+                onClick={() => setMeleeOpen((prev) => !prev)}
+              >
+                {meleeOpen ? "▾" : "▸"}
+              </button>
+            </div>
+            <div className="collapsible-content rule-block">
+              <ul className="rule-list">
+                <li>Удар рукой (Ловкость + Драка); Сл6; Урон: Сила — лёгкий удар.</li>
+                <li>Удар ногой (Ловкость + Драка); Сл7; Урон: Сила +1 — лёгкий удар.</li>
+                <li>
+                  Удар оружием (Ловкость + Фехтование); Сл6; Урон: Сила + оружие — тип урона
+                  по оружию. Удар в голову даёт тяжёлый урон.
+                </li>
+                <li>
+                  Подсечка (Ловкость + Драка/Фехтование); Сл7; Урон: Сила — цель делает
+                  рефлекторную проверку Ловкость + Атлетика (Сл8) или падает. Возможна через
+                  фехтование, если оружием можно сбить с ног (дубинка/посох/цеп).
+                </li>
+                <li>
+                  Бросок (Сила + Драка); Сл7; Урон: Сила +1 — вы и цель делаете рефлекторную
+                  проверку Выносливость + Атлетика (Сл7) или падаете. Цель получает +1 к Сл всех
+                  действий на следующий ход.
+                </li>
+                <li>
+                  Разоружение (Ловкость + Драка/Фехтование); Сл7 — нужно набрать успехи, равные
+                  Силе противника. Если выбивать оружие голыми руками, нужно успехов = Сила +
+                  урон оружия, иначе получаете урон как от атаки.
+                </li>
+                <li>
+                  Клинч (Сила + Драка); Сл6 — взаимный захват, возможны только проверки урона
+                  (Сила) или попытки выйти.
+                </li>
+                <li>
+                  Захват (Сила + Драка); Сл6 — обездвиживание цели. Любое действие, кроме укуса и
+                  шага, разрывает захват.
+                </li>
+                <li>
+                  Выход из клинча/захвата (Сила + Драка); Сл6 — взаимная проверка, если цель не
+                  отпускает.
+                </li>
+                <li>
+                  Ловкий захват/выход (Ловкость + Атлетика) — допускается вместо силы. Минус:
+                  захват не даёт управлять движением цели; она может шагать и пытаться выйти.
+                </li>
+                <li>
+                  Укус (Ловкость + Драка) +1d10; Сл6; Урон: Сила +1 — только по цели без защиты
+                  (в захвате/обездвижена/сбита с ног). Укус сверхъестественных существ наносит
+                  губительный урон; можно выпить 1 пункт крови.
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className={`sheet-card collapsible-card ${rangedOpen ? "" : "collapsed"}`}>
+            <div className="sheet-card-header collapsible-header">
+              <span>Манёвры: дистанционный бой</span>
+              <button
+                type="button"
+                className="icon-button collapsible-toggle"
+                aria-expanded={rangedOpen}
+                title={rangedOpen ? "Свернуть" : "Развернуть"}
+                onClick={() => setRangedOpen((prev) => !prev)}
+              >
+                {rangedOpen ? "▾" : "▸"}
+              </button>
+            </div>
+            <div className="collapsible-content rule-block">
+              <ul className="rule-list">
+                <li>
+                  Все манёвры с оружием дальнего боя используют проверку Ловкость + Стрельба.
+                </li>
+                <li>Параметр “Точность” = количество кубов, добавляемых к попаданию.</li>
+                <li>Одиночный выстрел: Сл6.</li>
+                <li>
+                  Стрельба по‑македонски: Сл+1 для второй проверки; лёгкое оружие в каждой руке;
+                  разделите пул между выстрелами.
+                </li>
+                <li>
+                  Короткая очередь: Сл+1; Точность +2 — очередь из трёх патронов.
+                </li>
+                <li>
+                  Длинная очередь: Сл+2; Точность +10 — весь магазин, нужна перезарядка; в
+                  магазине должно быть не менее половины патронов.
+                </li>
+                <li>
+                  Обстрел: Сл+2; Точность +10 — полный магазин по зоне ~3 м; успехи распределяются
+                  между всеми целями (минимум по одному при наличии успехов), затем урон по каждой.
+                </li>
+                <li>
+                  Перезарядка — тратит весь ход. Вариант: проверка Ловкость + Стрельба (Сл7): 1
+                  успех для пистолета/ПП, 2 — для автомата/тяжёлого оружия; револьвер без
+                  спидлоадера/дробовик — 1 успех за каждый патрон (Сл4).
+                </li>
+                <li>
+                  Наведение — даёт +1 куб на следующую проверку стрельбы, можно накапливать до
+                  значения Восприятия. Оптический прицел добавляет +2 куба при первом наведении
+                  (не учитываются в лимите). Вариант: проверка Восприятие + Стрельба; при провале
+                  бонус не даётся.
+                </li>
+                <li>Выстрел в упор: Сл−2 (дистанция меньше 2 м).</li>
+                <li>Выстрел вдаль: Сл+2 (дальность выше максимальной, но не более чем в 2 раза).</li>
+                <li>Прицеливание: средняя цель Сл+1; маленькая Сл+2 и Урон +1; крошечная Сл+3 и Урон +2.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className={`sheet-card collapsible-card ${defenseOpen ? "" : "collapsed"}`}>
+            <div className="sheet-card-header collapsible-header">
+              <span>Манёвры: защита</span>
+              <button
+                type="button"
+                className="icon-button collapsible-toggle"
+                aria-expanded={defenseOpen}
+                title={defenseOpen ? "Свернуть" : "Развернуть"}
+                onClick={() => setDefenseOpen((prev) => !prev)}
+              >
+                {defenseOpen ? "▾" : "▸"}
+              </button>
+            </div>
+            <div className="collapsible-content rule-block">
+              <ul className="rule-list">
+                <li>
+                  Уклонение (Ловкость + Атлетика); Сл6 — позволяет увернуться от атаки ближнего
+                  боя при наличии свободного места. В случае окружения со всех сторон не работает.
+                </li>
+                <li>
+                  Уклонение от выстрелов (Ловкость + Атлетика) — в V20 требует укрытия или
+                  перехода в положение лёжа. Вариант из Revised (Сл зависит от обстановки):
+                  <ul className="rule-list">
+                    <li>Уже в укрытии (только высунулся) — Сл2.</li>
+                    <li>Надёжное укрытие (в 1 м) — Сл4.</li>
+                    <li>Надёжное укрытие (в 3 м) — Сл6.</li>
+                    <li>Ненадёжное укрытие (в 1 м) — Сл6.</li>
+                    <li>Укрытия нет (падение в лёжку) — Сл8.</li>
+                  </ul>
+                  Адепты стремительности могут сдвигаться на 1 шаг вверх по таблице сложности.
+                </li>
+                <li>
+                  Парирование (Ловкость + Фехтование); Сл6 — блок атаки ближнего боя оружием. Если
+                  нападающий без холодного оружия, при большем числе успехов можно нанести урон,
+                  как при атаке.
+                </li>
+                <li>
+                  Блок (Ловкость + Драка); Сл6 — нивелирует успехи противника, как уклонение.
+                  Без брони или дисциплины Стойкость таким образом можно нейтрализовать только
+                  лёгкие повреждения.
+                </li>
+                <li>
+                  Домашнее правило: заменить Ловкость на Выносливость, а при наличии брони или
+                  Стойкости разрешить блокировать не только ближний бой, но и пули.
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className={`sheet-card collapsible-card ${multiOpen ? "" : "collapsed"}`}>
+            <div className="sheet-card-header collapsible-header">
+              <span>Манёвры: множественные действия</span>
+              <button
+                type="button"
+                className="icon-button collapsible-toggle"
+                aria-expanded={multiOpen}
+                title={multiOpen ? "Свернуть" : "Развернуть"}
+                onClick={() => setMultiOpen((prev) => !prev)}
+              >
+                {multiOpen ? "▾" : "▸"}
+              </button>
+            </div>
+            <div className="collapsible-content rule-block">
+              <ul className="rule-list">
+                <li>Заявите все действия в фазе декларации.</li>
+                <li>За каждое дополнительное действие уменьшите общий пул на 1 куб.</li>
+                <li>Разделите оставшийся пул между действиями (минимум 1 куб на действие).</li>
+                <li>Каждое действие бросается своим пулом.</li>
+              </ul>
+            </div>
+          </div>
+
         </div>
 
         <div className="sheet-col sheet-col-log">
@@ -1061,14 +1292,10 @@ export function GameMode({
               </button>
             </div>
             <div className="log-list">
-              {chronicleLogs.length === 0 && (
-                <div className="log-empty">Нет событий.</div>
-              )}
+              {chronicleLogs.length === 0 && <div className="log-empty">Нет событий.</div>}
               {chronicleLogs.map((log) => (
                 <div key={log._id} className="log-item">
-                  <div className="log-time">
-                    {new Date(log.createdAt).toLocaleString("ru-RU")}
-                  </div>
+                  <div className="log-time">{new Date(log.createdAt).toLocaleString("ru-RU")}</div>
                   <div className="log-message">{renderLogMessage(log)}</div>
                 </div>
               ))}
@@ -1079,3 +1306,4 @@ export function GameMode({
     </section>
   );
 }
+
