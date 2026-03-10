@@ -64,6 +64,7 @@ export function GameMode({
   const initiativeAnimTimeoutRef = useRef<number | null>(null);
 
   const maxBlood = character.derived?.bloodPoolMax ?? 0;
+  const maxHealth = 7;
   const resources = character.resources;
   const health = useMemo(() => resources.health, [resources.health]);
   const totalDamage = health.bashing + health.lethal + health.aggravated;
@@ -73,6 +74,16 @@ export function GameMode({
 
   const clampNumber = (value: number, min: number, max: number) =>
     Math.max(min, Math.min(max, value));
+
+  const statPercent = (value: number, max: number) => {
+    if (max <= 0) return 0;
+    return Math.max(0, Math.min(100, (value / max) * 100));
+  };
+
+  const bloodPercent = statPercent(resources.bloodPool.current, maxBlood);
+  const willpowerPercent = statPercent(resources.willpower.current, 10);
+  const humanityPercent = statPercent(resources.humanity.current, 10);
+  const healthPercent = statPercent(totalDamage, maxHealth);
 
   const buildTooltip = (...parts: Array<string | undefined | null>) => {
     const text = parts
@@ -423,7 +434,6 @@ export function GameMode({
   };
 
   const adjustHealth = (type: "bashing" | "lethal" | "aggravated", delta: number) => {
-    const maxHealth = 7;
     if (delta > 0 && totalDamage >= maxHealth) return;
     const allowedDelta = delta > 0 ? Math.min(delta, maxHealth - totalDamage) : delta;
     const next = {
@@ -644,7 +654,7 @@ export function GameMode({
   const avatarUrl = character.meta.avatarUrl?.trim();
 
   return (
-    <section className="page sheet">
+    <section className="page sheet game-mode">
       <div className="sheet-header">
         <div className="sheet-header-main">
           <div className={`sheet-avatar-frame ${avatarUrl ? "" : "empty"}`}>
@@ -704,7 +714,7 @@ export function GameMode({
         </div>
         <div className="sheet-header-right">
           <div className="sheet-stats">
-            <div className="stat-pill">
+            <div className="stat-pill" data-variant="blood">
               <span className="stat-icon" title="Кровь" aria-label="Кровь" role="img">
                 🩸
               </span>
@@ -732,8 +742,11 @@ export function GameMode({
                   +
                 </button>
               </div>
+              <div className="stat-bar" aria-hidden="true">
+                <span className="stat-bar-fill" style={{ width: `${bloodPercent}%` }} />
+              </div>
             </div>
-            <div className="stat-pill">
+            <div className="stat-pill" data-variant="willpower">
               <span className="stat-icon" title="Сила воли" aria-label="Сила воли" role="img">
                 🧠
               </span>
@@ -761,8 +774,11 @@ export function GameMode({
                   +
                 </button>
               </div>
+              <div className="stat-bar" aria-hidden="true">
+                <span className="stat-bar-fill" style={{ width: `${willpowerPercent}%` }} />
+              </div>
             </div>
-            <div className="stat-pill">
+            <div className="stat-pill" data-variant="humanity">
               <span className="stat-icon" title="Человечность" aria-label="Человечность" role="img">
                 😇
               </span>
@@ -790,104 +806,87 @@ export function GameMode({
                   +
                 </button>
               </div>
+              <div className="stat-bar" aria-hidden="true">
+                <span className="stat-bar-fill" style={{ width: `${humanityPercent}%` }} />
+              </div>
             </div>
-            <div className="stat-pill">
+          </div>
+          <div className="sheet-header-health compact-health">
+            <div className="stat-pill health-pill" data-variant="health">
               <span className="stat-icon" title="Здоровье" aria-label="Здоровье" role="img">
                 ❤️
               </span>
               <span className="stat-value">
                 {totalDamage}
-                <span className="stat-max">/7</span>
+                <span className="stat-max">/{maxHealth}</span>
               </span>
               <span className="stat-detail">
                 👊 {health.bashing} · 🔪 {health.lethal} · 🐾 {health.aggravated}
               </span>
+              <div className="stat-bar" aria-hidden="true">
+                <span className="stat-bar-fill" style={{ width: `${healthPercent}%` }} />
+              </div>
+            </div>
+            <div className="header-health-track">
+              <HealthTrack health={health} onChange={handleHealthChange} />
+              <div className="page-actions health-actions compact header-health-actions">
+                <HealthAdjustButton
+                  label="🧪"
+                  ariaLabel="Вылечить полностью"
+                  className="health-action-mini health-heal"
+                  onClick={healAll}
+                />
+                <HealthAdjustButton
+                  label="+1 👊"
+                  ariaLabel="+1 ударный"
+                  className="health-action-mini"
+                  onClick={() => adjustHealth("bashing", 1)}
+                />
+                <HealthAdjustButton
+                  label="-1 👊"
+                  ariaLabel="-1 ударный"
+                  className="health-action-mini"
+                  onClick={() => adjustHealth("bashing", -1)}
+                />
+                <HealthAdjustButton
+                  label="+1 🔪"
+                  ariaLabel="+1 летальный"
+                  className="health-action-mini"
+                  onClick={() => adjustHealth("lethal", 1)}
+                />
+                <HealthAdjustButton
+                  label="-1 🔪"
+                  ariaLabel="-1 летальный"
+                  className="health-action-mini"
+                  onClick={() => adjustHealth("lethal", -1)}
+                />
+                <HealthAdjustButton
+                  label="+1 🐾"
+                  ariaLabel="+1 агравированный"
+                  className="health-action-mini"
+                  onClick={() => adjustHealth("aggravated", 1)}
+                />
+                <HealthAdjustButton
+                  label="-1 🐾"
+                  ariaLabel="-1 агравированный"
+                  className="health-action-mini"
+                  onClick={() => adjustHealth("aggravated", -1)}
+                />
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="sheet-grid">
-        <div className="sheet-col">
-          <div className="sheet-card">
-            <div className="sheet-card-header">Характеристики</div>
-            {renderTraitList("Атрибуты", dictionaries.attributes, character.traits.attributes, true, {
-              selectable: true,
-              selectedKey: selectedAttributeKey,
-              onSelect: (key) => setSelectedAttributeKey((prev) => (prev === key ? null : key)),
-              columns: true
-            })}
-            {renderTraitList("Способности", dictionaries.abilities, character.traits.abilities, true, {
-              selectable: true,
-              selectedKey: selectedAbilityKey,
-              onSelect: (key) => setSelectedAbilityKey((prev) => (prev === key ? null : key)),
-              columns: true
-            })}
-          </div>
-        </div>
-
-        <div className="sheet-col">
-          <div className="sheet-card">
-            <div className="sheet-card-header">Сверхъестественное</div>
-            {renderTraitList("Дисциплины", dictionaries.disciplines, character.traits.disciplines, true, {
-              hideZero: true
-            })}
-            {renderTraitList(
-              "Детали биографии",
-              dictionaries.backgrounds,
-              character.traits.backgrounds,
-              true
-            )}
-            {renderTraitList("Добродетели", dictionaries.virtues, character.traits.virtues, true)}
-          </div>
-          <div className="sheet-card">
-            <div className="sheet-card-header">Достоинства / Недостатки</div>
-            <div className="trait-section">
-              <div className="trait-title">Достоинства</div>
-              <div className="trait-list">
-                {character.traits.merits.length === 0 && <div className="trait-empty">Нет</div>}
-                {character.traits.merits.map((key) => {
-                  const merit = dictionaries.merits.find((item) => item.key === key);
-                  const tooltip = buildTooltip(merit?.description);
-                  return (
-                    <div key={key} className="trait-row">
-                      <span className="trait-label">
-                        <span>{merit?.labelRu ?? key}</span>
-                        {renderHelpIcon(tooltip)}
-                      </span>
-                      <span className="trait-cost">{merit?.pointCost ?? "—"}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="trait-section">
-              <div className="trait-title">Недостатки</div>
-              <div className="trait-list">
-                {character.traits.flaws.length === 0 && <div className="trait-empty">Нет</div>}
-                {character.traits.flaws.map((key) => {
-                  const flaw = dictionaries.flaws.find((item) => item.key === key);
-                  const tooltip = buildTooltip(flaw?.description);
-                  return (
-                    <div key={key} className="trait-row">
-                      <span className="trait-label">
-                        <span>{flaw?.labelRu ?? key}</span>
-                        {renderHelpIcon(tooltip)}
-                      </span>
-                      <span className="trait-cost">{flaw?.pointCost ?? "—"}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="sheet-col">
-          <div className="sheet-card">
-            <div className="sheet-card-header">Бросок кубиков</div>
-            <div className="dice-roller">
-              <div className={`dice-panel ${diceRolling ? "is-rolling" : ""}`}>
+      <div className="sheet-row">
+        <div className="sheet-card action-card dice-row">
+          <div className="dice-roller">
+            <div
+              className={`dice-panel ${diceRolling ? "is-rolling" : ""} ${
+                rollResult ? "has-result" : ""
+              }`}
+            >
+              <div className="dice-main">
                 <div className="dice-title">
                   <span className="dice-icon" aria-hidden="true">
                     🎲
@@ -939,345 +938,386 @@ export function GameMode({
                     "Кликните по атрибуту и способности, чтобы подставить кубики"
                   )}
                 </div>
-                {rollResult && (
-                  <div className={`dice-result ${rollResult.status} ${diceRolling ? "is-rolling" : ""}`}>
-                    <div className="dice-values">
-                      {rollResult.values.map((value, index) => {
-                        const isSuccess = value >= diceDifficulty;
-                        const isOne = value === 1;
-                        return (
-                          <span
-                            key={`${value}-${index}`}
-                            className={`dice-die ${isSuccess ? "success" : "fail"} ${isOne ? "one" : ""}`}
-                            style={diceRolling ? { animationDelay: `${index * 40}ms` } : undefined}
-                          >
-                            {value}
-                          </span>
-                        );
-                      })}
-                    </div>
-                    <div className="dice-summary">
-                      <span>Успехи: {Math.max(0, rollResult.net)}</span>
-                      <span>Единицы: {rollResult.ones}</span>
-                      <span className="dice-status">
-                        {rollResult.status === "success"
-                          ? "Успех"
-                          : rollResult.status === "botch"
-                            ? "Критический провал"
-                            : "Провал"}
-                      </span>
-                    </div>
+              </div>
+              {rollResult && (
+                <div className={`dice-result ${rollResult.status} ${diceRolling ? "is-rolling" : ""}`}>
+                  <div className="dice-values">
+                    {rollResult.values.map((value, index) => {
+                      const isSuccess = value >= diceDifficulty;
+                      const isOne = value === 1;
+                      return (
+                        <span
+                          key={`${value}-${index}`}
+                          className={`dice-die ${isSuccess ? "success" : "fail"} ${isOne ? "one" : ""}`}
+                          style={diceRolling ? { animationDelay: `${index * 40}ms` } : undefined}
+                        >
+                          {value}
+                        </span>
+                      );
+                    })}
                   </div>
-                )}
-              </div>
-              <div className={`initiative-panel ${initiativeRolling ? "is-rolling" : ""}`}>
-                <div className="initiative-title">
-                  <span className="initiative-icon" aria-hidden="true">
-                    ⚡
-                  </span>
-                  Инициатива
+                  <div className="dice-summary">
+                    <span>Успехи: {Math.max(0, rollResult.net)}</span>
+                    <span>Единицы: {rollResult.ones}</span>
+                    <span className="dice-status">
+                      {rollResult.status === "success"
+                        ? "Успех"
+                        : rollResult.status === "botch"
+                          ? "Критический провал"
+                          : "Провал"}
+                    </span>
+                  </div>
                 </div>
-                <button type="button" className="initiative-button" onClick={handleRollInitiative}>
-                  Бросить
+              )}
+            </div>
+            <div className={`initiative-panel ${initiativeRolling ? "is-rolling" : ""}`}>
+              <div className="initiative-title">
+                <span className="initiative-icon" aria-hidden="true">
+                  ⚡
+                </span>
+                Инициатива
+              </div>
+              <button type="button" className="initiative-button" onClick={handleRollInitiative}>
+                Бросить
+              </button>
+              <div className={`initiative-value ${initiativeRolling ? "is-rolling" : ""}`}>
+                {initiativeResult === null ? "—" : initiativeResult}
+              </div>
+              <div className="initiative-formula">Ловкость + Смекалка + d10</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="sheet-grid">
+        <div className="sheet-col">
+          <div className="sheet-card">
+            {renderTraitList("Атрибуты", dictionaries.attributes, character.traits.attributes, true, {
+              selectable: true,
+              selectedKey: selectedAttributeKey,
+              onSelect: (key) => setSelectedAttributeKey((prev) => (prev === key ? null : key)),
+              columns: true
+            })}
+          </div>
+          <div className="sheet-card">
+            <div className="sheet-card-header">Сверхъестественное</div>
+            {renderTraitList("Дисциплины", dictionaries.disciplines, character.traits.disciplines, true, {
+              hideZero: true
+            })}
+            {renderTraitList(
+              "Детали биографии",
+              dictionaries.backgrounds,
+              character.traits.backgrounds,
+              true
+            )}
+            {renderTraitList("Добродетели", dictionaries.virtues, character.traits.virtues, true)}
+          </div>
+
+          <div className="sheet-card combat-guide">
+            <div className="sheet-card-header">Справка по бою</div>
+            <div className={`guide-section collapsible-card ${combatRulesOpen ? "" : "collapsed"}`}>
+              <div className="collapsible-header guide-header">
+                <span>Бой: фазы</span>
+                <button
+                  type="button"
+                  className="icon-button collapsible-toggle"
+                  aria-expanded={combatRulesOpen}
+                  title={combatRulesOpen ? "Свернуть" : "Развернуть"}
+                  onClick={() => setCombatRulesOpen((prev) => !prev)}
+                >
+                  {combatRulesOpen ? "▾" : "▸"}
                 </button>
-                <div className={`initiative-value ${initiativeRolling ? "is-rolling" : ""}`}>
-                  {initiativeResult === null ? "—" : initiativeResult}
-                </div>
-                <div className="initiative-formula">Ловкость + Смекалка + d10</div>
+              </div>
+              <div className="collapsible-content rule-block">
+                <ol className="rule-list">
+                  <li>Инициатива: Ловкость + Смекалка + d10 (при равенстве сравните базу).</li>
+                  <li>Декларация действий: от низкой инициативы к высокой.</li>
+                  <li>Разрешение действий: от высокой инициативы к низкой.</li>
+                  <li>Атака → защита/уклонение (если доступно) → урон.</li>
+                  <li>Урон = база + успехи атаки.</li>
+                  <li>
+                    Поглощение (последовательность):
+                    <ul className="rule-list">
+                      <li>Определите тип урона (ударный/летальный/агравированный).</li>
+                      <li>
+                        Соберите пул поглощения: Телосложение + броня/снаряжение + дисциплины (если
+                        применимо).
+                      </li>
+                      <li>Бросьте поглощение, каждый успех снижает урон на 1.</li>
+                      <li>Оставшийся урон отмечается на шкале здоровья.</li>
+                    </ul>
+                  </li>
+                  <li>Завершите раунд и переходите к следующему.</li>
+                </ol>
+              </div>
+            </div>
+
+            <div className={`guide-section collapsible-card ${meleeOpen ? "" : "collapsed"}`}>
+              <div className="collapsible-header guide-header">
+                <span>Манёвры: ближний бой</span>
+                <button
+                  type="button"
+                  className="icon-button collapsible-toggle"
+                  aria-expanded={meleeOpen}
+                  title={meleeOpen ? "Свернуть" : "Развернуть"}
+                  onClick={() => setMeleeOpen((prev) => !prev)}
+                >
+                  {meleeOpen ? "▾" : "▸"}
+                </button>
+              </div>
+              <div className="collapsible-content rule-block">
+                <ul className="rule-list">
+                  <li>Удар рукой (Ловкость + Драка); Сл6; Урон: Сила — лёгкий удар.</li>
+                  <li>Удар ногой (Ловкость + Драка); Сл7; Урон: Сила +1 — лёгкий удар.</li>
+                  <li>
+                    Удар оружием (Ловкость + Фехтование); Сл6; Урон: Сила + оружие — тип урона по
+                    оружию. Удар в голову даёт тяжёлый урон.
+                  </li>
+                  <li>
+                    Подсечка (Ловкость + Драка/Фехтование); Сл7; Урон: Сила — цель делает
+                    рефлекторную проверку Ловкость + Атлетика (Сл8) или падает. Возможна через
+                    фехтование, если оружием можно сбить с ног (дубинка/посох/цеп).
+                  </li>
+                  <li>
+                    Бросок (Сила + Драка); Сл7; Урон: Сила +1 — вы и цель делаете рефлекторную
+                    проверку Выносливость + Атлетика (Сл7) или падаете. Цель получает +1 к Сл всех
+                    действий на следующий ход.
+                  </li>
+                  <li>
+                    Разоружение (Ловкость + Драка/Фехтование); Сл7 — нужно набрать успехи, равные
+                    Силе противника. Если выбивать оружие голыми руками, нужно успехов = Сила +
+                    урон оружия, иначе получаете урон как от атаки.
+                  </li>
+                  <li>
+                    Клинч (Сила + Драка); Сл6 — взаимный захват, возможны только проверки урона
+                    (Сила) или попытки выйти.
+                  </li>
+                  <li>
+                    Захват (Сила + Драка); Сл6 — обездвиживание цели. Любое действие, кроме укуса и
+                    шага, разрывает захват.
+                  </li>
+                  <li>
+                    Выход из клинча/захвата (Сила + Драка); Сл6 — взаимная проверка, если цель не
+                    отпускает.
+                  </li>
+                  <li>
+                    Ловкий захват/выход (Ловкость + Атлетика) — допускается вместо силы. Минус:
+                    захват не даёт управлять движением цели; она может шагать и пытаться выйти.
+                  </li>
+                  <li>
+                    Укус (Ловкость + Драка) +1d10; Сл6; Урон: Сила +1 — только по цели без защиты
+                    (в захвате/обездвижена/сбита с ног). Укус сверхъестественных существ наносит
+                    губительный урон; можно выпить 1 пункт крови.
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className={`guide-section collapsible-card ${rangedOpen ? "" : "collapsed"}`}>
+              <div className="collapsible-header guide-header">
+                <span>Манёвры: дистанционный бой</span>
+                <button
+                  type="button"
+                  className="icon-button collapsible-toggle"
+                  aria-expanded={rangedOpen}
+                  title={rangedOpen ? "Свернуть" : "Развернуть"}
+                  onClick={() => setRangedOpen((prev) => !prev)}
+                >
+                  {rangedOpen ? "▾" : "▸"}
+                </button>
+              </div>
+              <div className="collapsible-content rule-block">
+                <ul className="rule-list">
+                  <li>
+                    Все манёвры с оружием дальнего боя используют проверку Ловкость + Стрельба.
+                  </li>
+                  <li>Параметр “Точность” = количество кубов, добавляемых к попаданию.</li>
+                  <li>Одиночный выстрел: Сл6.</li>
+                  <li>
+                    Стрельба по‑македонски: Сл+1 для второй проверки; лёгкое оружие в каждой руке;
+                    разделите пул между выстрелами.
+                  </li>
+                  <li>Короткая очередь: Сл+1; Точность +2 — очередь из трёх патронов.</li>
+                  <li>
+                    Длинная очередь: Сл+2; Точность +10 — весь магазин, нужна перезарядка; в
+                    магазине должно быть не менее половины патронов.
+                  </li>
+                  <li>
+                    Обстрел: Сл+2; Точность +10 — полный магазин по зоне ~3 м; успехи распределяются
+                    между всеми целями (минимум по одному при наличии успехов), затем урон по каждой.
+                  </li>
+                  <li>
+                    Перезарядка — тратит весь ход. Вариант: проверка Ловкость + Стрельба (Сл7): 1
+                    успех для пистолета/ПП, 2 — для автомата/тяжёлого оружия; револьвер без
+                    спидлоадера/дробовик — 1 успех за каждый патрон (Сл4).
+                  </li>
+                  <li>
+                    Наведение — даёт +1 куб на следующую проверку стрельбы, можно накапливать до
+                    значения Восприятия. Оптический прицел добавляет +2 куба при первом наведении
+                    (не учитываются в лимите). Вариант: проверка Восприятие + Стрельба; при провале
+                    бонус не даётся.
+                  </li>
+                  <li>Выстрел в упор: Сл−2 (дистанция меньше 2 м).</li>
+                  <li>Выстрел вдаль: Сл+2 (дальность выше максимальной, но не более чем в 2 раза).</li>
+                  <li>
+                    Прицеливание: средняя цель Сл+1; маленькая Сл+2 и Урон +1; крошечная Сл+3 и
+                    Урон +2.
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className={`guide-section collapsible-card ${defenseOpen ? "" : "collapsed"}`}>
+              <div className="collapsible-header guide-header">
+                <span>Манёвры: защита</span>
+                <button
+                  type="button"
+                  className="icon-button collapsible-toggle"
+                  aria-expanded={defenseOpen}
+                  title={defenseOpen ? "Свернуть" : "Развернуть"}
+                  onClick={() => setDefenseOpen((prev) => !prev)}
+                >
+                  {defenseOpen ? "▾" : "▸"}
+                </button>
+              </div>
+              <div className="collapsible-content rule-block">
+                <ul className="rule-list">
+                  <li>
+                    Уклонение (Ловкость + Атлетика); Сл6 — позволяет увернуться от атаки ближнего
+                    боя при наличии свободного места. В случае окружения со всех сторон не работает.
+                  </li>
+                  <li>
+                    Уклонение от выстрелов (Ловкость + Атлетика) — в V20 требует укрытия или
+                    перехода в положение лёжа. Вариант из Revised (Сл зависит от обстановки):
+                    <ul className="rule-list">
+                      <li>Уже в укрытии (только высунулся) — Сл2.</li>
+                      <li>Надёжное укрытие (в 1 м) — Сл4.</li>
+                      <li>Надёжное укрытие (в 3 м) — Сл6.</li>
+                      <li>Ненадёжное укрытие (в 1 м) — Сл6.</li>
+                      <li>Укрытия нет (падение в лёжку) — Сл8.</li>
+                    </ul>
+                    Адепты стремительности могут сдвигаться на 1 шаг вверх по таблице сложности.
+                  </li>
+                  <li>
+                    Парирование (Ловкость + Фехтование); Сл6 — блок атаки ближнего боя оружием. Если
+                    нападающий без холодного оружия, при большем числе успехов можно нанести урон,
+                    как при атаке.
+                  </li>
+                  <li>
+                    Блок (Ловкость + Драка); Сл6 — нивелирует успехи противника, как уклонение.
+                    Без брони или дисциплины Стойкость таким образом можно нейтрализовать только
+                    лёгкие повреждения.
+                  </li>
+                  <li>
+                    Домашнее правило: заменить Ловкость на Выносливость, а при наличии брони или
+                    Стойкости разрешить блокировать не только ближний бой, но и пули.
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className={`guide-section collapsible-card ${multiOpen ? "" : "collapsed"}`}>
+              <div className="collapsible-header guide-header">
+                <span>Манёвры: множественные действия</span>
+                <button
+                  type="button"
+                  className="icon-button collapsible-toggle"
+                  aria-expanded={multiOpen}
+                  title={multiOpen ? "Свернуть" : "Развернуть"}
+                  onClick={() => setMultiOpen((prev) => !prev)}
+                >
+                  {multiOpen ? "▾" : "▸"}
+                </button>
+              </div>
+              <div className="collapsible-content rule-block">
+                <ul className="rule-list">
+                  <li>Заявите все действия в фазе декларации.</li>
+                  <li>За каждое дополнительное действие уменьшите общий пул на 1 куб.</li>
+                  <li>Разделите оставшийся пул между действиями (минимум 1 куб на действие).</li>
+                  <li>Каждое действие бросается своим пулом.</li>
+                </ul>
               </div>
             </div>
           </div>
-
-          <div className="sheet-card compact-health">
-            <div className="sheet-card-header">Здоровье</div>
-            <HealthTrack health={health} onChange={handleHealthChange} />
-            <div className="page-actions health-actions compact">
-              <HealthAdjustButton
-                label="🧪"
-                ariaLabel="Вылечить полностью"
-                className="health-action-mini health-heal"
-                onClick={healAll}
-              />
-              <HealthAdjustButton
-                label="+1 👊"
-                ariaLabel="+1 ударный"
-                className="health-action-mini"
-                onClick={() => adjustHealth("bashing", 1)}
-              />
-              <HealthAdjustButton
-                label="-1 👊"
-                ariaLabel="-1 ударный"
-                className="health-action-mini"
-                onClick={() => adjustHealth("bashing", -1)}
-              />
-              <HealthAdjustButton
-                label="+1 🔪"
-                ariaLabel="+1 летальный"
-                className="health-action-mini"
-                onClick={() => adjustHealth("lethal", 1)}
-              />
-              <HealthAdjustButton
-                label="-1 🔪"
-                ariaLabel="-1 летальный"
-                className="health-action-mini"
-                onClick={() => adjustHealth("lethal", -1)}
-              />
-              <HealthAdjustButton
-                label="+1 🐾"
-                ariaLabel="+1 агравированный"
-                className="health-action-mini"
-                onClick={() => adjustHealth("aggravated", 1)}
-              />
-              <HealthAdjustButton
-                label="-1 🐾"
-                ariaLabel="-1 агравированный"
-                className="health-action-mini"
-                onClick={() => adjustHealth("aggravated", -1)}
-              />
-            </div>
-          </div>
-
-          <div className="sheet-card">
-            <div className="sheet-card-header">Заметки</div>
-            <textarea
-              className="compact-textarea"
-              rows={4}
-              value={character.notes}
-              onChange={(event) => onPatch("notes", event.target.value)}
-            />
-          </div>
-          <div className="sheet-card">
-            <div className="sheet-card-header">Снаряжение</div>
-            <textarea
-              className="compact-textarea"
-              rows={4}
-              value={character.equipment}
-              onChange={(event) => onPatch("equipment", event.target.value)}
-            />
-          </div>
-          <div className={`sheet-card collapsible-card ${combatRulesOpen ? "" : "collapsed"}`}>
-            <div className="sheet-card-header collapsible-header">
-              <span>Бой: фазы</span>
-              <button
-                type="button"
-                className="icon-button collapsible-toggle"
-                aria-expanded={combatRulesOpen}
-                title={combatRulesOpen ? "Свернуть" : "Развернуть"}
-                onClick={() => setCombatRulesOpen((prev) => !prev)}
-              >
-                {combatRulesOpen ? "▾" : "▸"}
-              </button>
-            </div>
-            <div className="collapsible-content rule-block">
-              <ol className="rule-list">
-                <li>Инициатива: Ловкость + Смекалка + d10 (при равенстве сравните базу).</li>
-                <li>Декларация действий: от низкой инициативы к высокой.</li>
-                <li>Разрешение действий: от высокой инициативы к низкой.</li>
-                <li>Атака → защита/уклонение (если доступно) → урон.</li>
-                <li>Урон = база + успехи атаки.</li>
-                <li>
-                  Поглощение (последовательность):
-                  <ul className="rule-list">
-                    <li>Определите тип урона (ударный/летальный/агравированный).</li>
-                    <li>Соберите пул поглощения: Телосложение + броня/снаряжение + дисциплины (если применимо).</li>
-                    <li>Бросьте поглощение, каждый успех снижает урон на 1.</li>
-                    <li>Оставшийся урон отмечается на шкале здоровья.</li>
-                  </ul>
-                </li>
-                <li>Завершите раунд и переходите к следующему.</li>
-              </ol>
-            </div>
-          </div>
-
-          <div className={`sheet-card collapsible-card ${meleeOpen ? "" : "collapsed"}`}>
-            <div className="sheet-card-header collapsible-header">
-              <span>Манёвры: ближний бой</span>
-              <button
-                type="button"
-                className="icon-button collapsible-toggle"
-                aria-expanded={meleeOpen}
-                title={meleeOpen ? "Свернуть" : "Развернуть"}
-                onClick={() => setMeleeOpen((prev) => !prev)}
-              >
-                {meleeOpen ? "▾" : "▸"}
-              </button>
-            </div>
-            <div className="collapsible-content rule-block">
-              <ul className="rule-list">
-                <li>Удар рукой (Ловкость + Драка); Сл6; Урон: Сила — лёгкий удар.</li>
-                <li>Удар ногой (Ловкость + Драка); Сл7; Урон: Сила +1 — лёгкий удар.</li>
-                <li>
-                  Удар оружием (Ловкость + Фехтование); Сл6; Урон: Сила + оружие — тип урона
-                  по оружию. Удар в голову даёт тяжёлый урон.
-                </li>
-                <li>
-                  Подсечка (Ловкость + Драка/Фехтование); Сл7; Урон: Сила — цель делает
-                  рефлекторную проверку Ловкость + Атлетика (Сл8) или падает. Возможна через
-                  фехтование, если оружием можно сбить с ног (дубинка/посох/цеп).
-                </li>
-                <li>
-                  Бросок (Сила + Драка); Сл7; Урон: Сила +1 — вы и цель делаете рефлекторную
-                  проверку Выносливость + Атлетика (Сл7) или падаете. Цель получает +1 к Сл всех
-                  действий на следующий ход.
-                </li>
-                <li>
-                  Разоружение (Ловкость + Драка/Фехтование); Сл7 — нужно набрать успехи, равные
-                  Силе противника. Если выбивать оружие голыми руками, нужно успехов = Сила +
-                  урон оружия, иначе получаете урон как от атаки.
-                </li>
-                <li>
-                  Клинч (Сила + Драка); Сл6 — взаимный захват, возможны только проверки урона
-                  (Сила) или попытки выйти.
-                </li>
-                <li>
-                  Захват (Сила + Драка); Сл6 — обездвиживание цели. Любое действие, кроме укуса и
-                  шага, разрывает захват.
-                </li>
-                <li>
-                  Выход из клинча/захвата (Сила + Драка); Сл6 — взаимная проверка, если цель не
-                  отпускает.
-                </li>
-                <li>
-                  Ловкий захват/выход (Ловкость + Атлетика) — допускается вместо силы. Минус:
-                  захват не даёт управлять движением цели; она может шагать и пытаться выйти.
-                </li>
-                <li>
-                  Укус (Ловкость + Драка) +1d10; Сл6; Урон: Сила +1 — только по цели без защиты
-                  (в захвате/обездвижена/сбита с ног). Укус сверхъестественных существ наносит
-                  губительный урон; можно выпить 1 пункт крови.
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div className={`sheet-card collapsible-card ${rangedOpen ? "" : "collapsed"}`}>
-            <div className="sheet-card-header collapsible-header">
-              <span>Манёвры: дистанционный бой</span>
-              <button
-                type="button"
-                className="icon-button collapsible-toggle"
-                aria-expanded={rangedOpen}
-                title={rangedOpen ? "Свернуть" : "Развернуть"}
-                onClick={() => setRangedOpen((prev) => !prev)}
-              >
-                {rangedOpen ? "▾" : "▸"}
-              </button>
-            </div>
-            <div className="collapsible-content rule-block">
-              <ul className="rule-list">
-                <li>
-                  Все манёвры с оружием дальнего боя используют проверку Ловкость + Стрельба.
-                </li>
-                <li>Параметр “Точность” = количество кубов, добавляемых к попаданию.</li>
-                <li>Одиночный выстрел: Сл6.</li>
-                <li>
-                  Стрельба по‑македонски: Сл+1 для второй проверки; лёгкое оружие в каждой руке;
-                  разделите пул между выстрелами.
-                </li>
-                <li>
-                  Короткая очередь: Сл+1; Точность +2 — очередь из трёх патронов.
-                </li>
-                <li>
-                  Длинная очередь: Сл+2; Точность +10 — весь магазин, нужна перезарядка; в
-                  магазине должно быть не менее половины патронов.
-                </li>
-                <li>
-                  Обстрел: Сл+2; Точность +10 — полный магазин по зоне ~3 м; успехи распределяются
-                  между всеми целями (минимум по одному при наличии успехов), затем урон по каждой.
-                </li>
-                <li>
-                  Перезарядка — тратит весь ход. Вариант: проверка Ловкость + Стрельба (Сл7): 1
-                  успех для пистолета/ПП, 2 — для автомата/тяжёлого оружия; револьвер без
-                  спидлоадера/дробовик — 1 успех за каждый патрон (Сл4).
-                </li>
-                <li>
-                  Наведение — даёт +1 куб на следующую проверку стрельбы, можно накапливать до
-                  значения Восприятия. Оптический прицел добавляет +2 куба при первом наведении
-                  (не учитываются в лимите). Вариант: проверка Восприятие + Стрельба; при провале
-                  бонус не даётся.
-                </li>
-                <li>Выстрел в упор: Сл−2 (дистанция меньше 2 м).</li>
-                <li>Выстрел вдаль: Сл+2 (дальность выше максимальной, но не более чем в 2 раза).</li>
-                <li>Прицеливание: средняя цель Сл+1; маленькая Сл+2 и Урон +1; крошечная Сл+3 и Урон +2.</li>
-              </ul>
-            </div>
-          </div>
-
-          <div className={`sheet-card collapsible-card ${defenseOpen ? "" : "collapsed"}`}>
-            <div className="sheet-card-header collapsible-header">
-              <span>Манёвры: защита</span>
-              <button
-                type="button"
-                className="icon-button collapsible-toggle"
-                aria-expanded={defenseOpen}
-                title={defenseOpen ? "Свернуть" : "Развернуть"}
-                onClick={() => setDefenseOpen((prev) => !prev)}
-              >
-                {defenseOpen ? "▾" : "▸"}
-              </button>
-            </div>
-            <div className="collapsible-content rule-block">
-              <ul className="rule-list">
-                <li>
-                  Уклонение (Ловкость + Атлетика); Сл6 — позволяет увернуться от атаки ближнего
-                  боя при наличии свободного места. В случае окружения со всех сторон не работает.
-                </li>
-                <li>
-                  Уклонение от выстрелов (Ловкость + Атлетика) — в V20 требует укрытия или
-                  перехода в положение лёжа. Вариант из Revised (Сл зависит от обстановки):
-                  <ul className="rule-list">
-                    <li>Уже в укрытии (только высунулся) — Сл2.</li>
-                    <li>Надёжное укрытие (в 1 м) — Сл4.</li>
-                    <li>Надёжное укрытие (в 3 м) — Сл6.</li>
-                    <li>Ненадёжное укрытие (в 1 м) — Сл6.</li>
-                    <li>Укрытия нет (падение в лёжку) — Сл8.</li>
-                  </ul>
-                  Адепты стремительности могут сдвигаться на 1 шаг вверх по таблице сложности.
-                </li>
-                <li>
-                  Парирование (Ловкость + Фехтование); Сл6 — блок атаки ближнего боя оружием. Если
-                  нападающий без холодного оружия, при большем числе успехов можно нанести урон,
-                  как при атаке.
-                </li>
-                <li>
-                  Блок (Ловкость + Драка); Сл6 — нивелирует успехи противника, как уклонение.
-                  Без брони или дисциплины Стойкость таким образом можно нейтрализовать только
-                  лёгкие повреждения.
-                </li>
-                <li>
-                  Домашнее правило: заменить Ловкость на Выносливость, а при наличии брони или
-                  Стойкости разрешить блокировать не только ближний бой, но и пули.
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div className={`sheet-card collapsible-card ${multiOpen ? "" : "collapsed"}`}>
-            <div className="sheet-card-header collapsible-header">
-              <span>Манёвры: множественные действия</span>
-              <button
-                type="button"
-                className="icon-button collapsible-toggle"
-                aria-expanded={multiOpen}
-                title={multiOpen ? "Свернуть" : "Развернуть"}
-                onClick={() => setMultiOpen((prev) => !prev)}
-              >
-                {multiOpen ? "▾" : "▸"}
-              </button>
-            </div>
-            <div className="collapsible-content rule-block">
-              <ul className="rule-list">
-                <li>Заявите все действия в фазе декларации.</li>
-                <li>За каждое дополнительное действие уменьшите общий пул на 1 куб.</li>
-                <li>Разделите оставшийся пул между действиями (минимум 1 куб на действие).</li>
-                <li>Каждое действие бросается своим пулом.</li>
-              </ul>
-            </div>
-          </div>
-
         </div>
 
-        <div className="sheet-col sheet-col-log">
+        <div className="sheet-col">
+          <div className="sheet-card">
+            {renderTraitList("Способности", dictionaries.abilities, character.traits.abilities, true, {
+              selectable: true,
+              selectedKey: selectedAbilityKey,
+              onSelect: (key) => setSelectedAbilityKey((prev) => (prev === key ? null : key)),
+              columns: true
+            })}
+          </div>
+          <div className="sheet-card">
+            <div className="sheet-card-header">Достоинства / Недостатки</div>
+            <div className="merits-flaws-grid">
+              <div className="trait-section">
+                <div className="trait-title">Достоинства</div>
+                <div className="trait-list">
+                  {character.traits.merits.length === 0 && <div className="trait-empty">Нет</div>}
+                  {character.traits.merits.map((key) => {
+                    const merit = dictionaries.merits.find((item) => item.key === key);
+                    const tooltip = buildTooltip(merit?.description);
+                    return (
+                      <div key={key} className="trait-row">
+                        <span className="trait-label">
+                          <span>{merit?.labelRu ?? key}</span>
+                          {renderHelpIcon(tooltip)}
+                        </span>
+                        <span className="trait-cost">{merit?.pointCost ?? "—"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="trait-section">
+                <div className="trait-title">Недостатки</div>
+                <div className="trait-list">
+                  {character.traits.flaws.length === 0 && <div className="trait-empty">Нет</div>}
+                  {character.traits.flaws.map((key) => {
+                    const flaw = dictionaries.flaws.find((item) => item.key === key);
+                    const tooltip = buildTooltip(flaw?.description);
+                    return (
+                      <div key={key} className="trait-row">
+                        <span className="trait-label">
+                          <span>{flaw?.labelRu ?? key}</span>
+                          {renderHelpIcon(tooltip)}
+                        </span>
+                        <span className="trait-cost">{flaw?.pointCost ?? "—"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="sheet-card">
+            <div className="sheet-card-header">Заметки и снаряжение</div>
+            <div className="notes-grid">
+              <div className="trait-section">
+                <div className="trait-title">Заметки</div>
+                <textarea
+                  className="compact-textarea"
+                  rows={4}
+                  value={character.notes}
+                  onChange={(event) => onPatch("notes", event.target.value)}
+                />
+              </div>
+              <div className="trait-section">
+                <div className="trait-title">Снаряжение</div>
+                <textarea
+                  className="compact-textarea"
+                  rows={4}
+                  value={character.equipment}
+                  onChange={(event) => onPatch("equipment", event.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
           <div className={`sheet-card log-panel ${logOpen ? "" : "collapsed"}`}>
             <div className="sheet-card-header log-header">
               <span>Лог хроники</span>
@@ -1306,4 +1346,3 @@ export function GameMode({
     </section>
   );
 }
-

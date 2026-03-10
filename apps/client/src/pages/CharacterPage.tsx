@@ -5,6 +5,7 @@ import type { CharacterDto } from "../api/types";
 import { GameMode } from "../components/GameMode";
 import { Wizard } from "../components/Wizard";
 import { useToast } from "../context/ToastContext";
+import { useAppHeader } from "../context/AppHeaderContext";
 import { useCharacterSocket } from "../hooks/useCharacterSocket";
 import { setByPath } from "../utils/setByPath";
 import NotFound from "./NotFound";
@@ -16,6 +17,7 @@ export default function CharacterPage() {
   const [notFound, setNotFound] = useState(false);
   const { pushToast } = useToast();
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const { setActions } = useAppHeader();
 
   const fetchCharacter = useCallback(async () => {
     if (!uuid) return;
@@ -95,16 +97,16 @@ export default function CharacterPage() {
     [applyLocalPatch, character, sendPatch, uuid]
   );
 
-  const handleCopy = async () => {
+  const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
       pushToast("Ссылка скопирована", "success");
     } catch {
       pushToast("Не удалось скопировать ссылку", "error");
     }
-  };
+  }, [pushToast]);
 
-  const handleExport = async () => {
+  const handleExport = useCallback(async () => {
     if (!uuid) return;
     try {
       const data = await api.get<Record<string, unknown>>(`/characters/${uuid}/export`);
@@ -119,9 +121,9 @@ export default function CharacterPage() {
     } catch (err: any) {
       pushToast(err?.message ?? "Не удалось экспортировать", "error");
     }
-  };
+  }, [pushToast, uuid]);
 
-  const handleImportFile = async (event: ChangeEvent<HTMLInputElement>) => {
+  const handleImportFile = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !uuid) return;
     try {
@@ -136,11 +138,65 @@ export default function CharacterPage() {
     } finally {
       event.target.value = "";
     }
-  };
+  }, [fetchCharacter, pushToast, uuid]);
 
-  const characterName = useMemo(() => {
-    return character?.meta?.name?.trim() || "(Без имени)";
-  }, [character]);
+  const characterUuid = character?.uuid;
+  const headerActions = useMemo(() => {
+    if (!characterUuid || !character?.creationFinished) {
+      return null;
+    }
+    return (
+      <>
+        <button
+          type="button"
+          className="icon-button"
+          title="Скопировать ссылку"
+          aria-label="Скопировать ссылку"
+          onClick={handleCopy}
+        >
+          🔗
+        </button>
+        <button
+          type="button"
+          className="icon-button"
+          title="Экспорт JSON"
+          aria-label="Экспорт JSON"
+          onClick={handleExport}
+        >
+          ⤓
+        </button>
+        <button
+          type="button"
+          className="icon-button"
+          title="Импорт JSON"
+          aria-label="Импорт JSON"
+          onClick={() => importInputRef.current?.click()}
+        >
+          ⤒
+        </button>
+        <Link
+          to={`/c/${characterUuid}/st`}
+          className="icon-button"
+          title="Перейти в режим ведущего"
+          aria-label="Перейти в режим ведущего"
+        >
+          🎲
+        </Link>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept="application/json"
+          style={{ display: "none" }}
+          onChange={handleImportFile}
+        />
+      </>
+    );
+  }, [character?.creationFinished, characterUuid, handleCopy, handleExport, handleImportFile]);
+
+  useEffect(() => {
+    setActions(headerActions);
+    return () => setActions(null);
+  }, [headerActions, setActions]);
 
   if (loading) {
     return (
@@ -157,56 +213,6 @@ export default function CharacterPage() {
 
   return (
     <section className="page">
-      <div className="card">
-        <div className="card-header">
-          <div className="section-title">{characterName}</div>
-          <div className="page-actions header-actions">
-          <button
-            type="button"
-            className="icon-button"
-            title="Скопировать ссылку"
-            aria-label="Скопировать ссылку"
-            onClick={handleCopy}
-          >
-            🔗
-          </button>
-          <button
-            type="button"
-            className="icon-button"
-            title="Экспорт JSON"
-            aria-label="Экспорт JSON"
-            onClick={handleExport}
-          >
-            ⤓
-          </button>
-          <button
-            type="button"
-            className="icon-button"
-            title="Импорт JSON"
-            aria-label="Импорт JSON"
-            onClick={() => importInputRef.current?.click()}
-          >
-            ⤒
-          </button>
-          <Link
-            to={`/c/${character.uuid}/st`}
-            className="icon-button"
-            title="Перейти в режим ведущего"
-            aria-label="Перейти в режим ведущего"
-          >
-            🎲
-          </Link>
-          </div>
-        </div>
-        <input
-          ref={importInputRef}
-          type="file"
-          accept="application/json"
-          style={{ display: "none" }}
-          onChange={handleImportFile}
-        />
-      </div>
-
       {!character.creationFinished ? (
         <Wizard
           character={character}
