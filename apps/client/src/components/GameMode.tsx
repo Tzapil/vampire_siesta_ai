@@ -6,12 +6,15 @@ import type {
   CharacterDto,
   ChronicleDto,
   ChronicleLogDto,
+  CombatInitiativeDto,
+  CombatStateDto,
   DictItem,
   LayeredValue
 } from "../api/types";
 import { useDictionaries } from "../context/DictionariesContext";
 import { useToast } from "../context/ToastContext";
 import { HealthTrack } from "./HealthTrack";
+import { woundPenalty } from "../utils/health";
 
 function HealthAdjustButton({
   label,
@@ -68,6 +71,7 @@ export function GameMode({
   const resources = character.resources;
   const health = useMemo(() => resources.health, [resources.health]);
   const totalDamage = health.bashing + health.lethal + health.aggravated;
+  const woundMod = woundPenalty(totalDamage);
 
   const totalFor = (layer?: LayeredValue) =>
     layer ? layer.base + layer.freebie + layer.storyteller : 0;
@@ -139,13 +143,14 @@ export function GameMode({
     if (!selectedAttributeKey || !selectedAbilityKey) return;
     const attrTotal = totalFor(character.traits.attributes[selectedAttributeKey]);
     const abilityTotal = totalFor(character.traits.abilities[selectedAbilityKey]);
-    const next = clampNumber(attrTotal + abilityTotal, 1, 20);
+    const next = clampNumber(attrTotal + abilityTotal + woundMod, 1, 20);
     setDiceCount(next);
   }, [
     selectedAttributeKey,
     selectedAbilityKey,
     character.traits.attributes,
-    character.traits.abilities
+    character.traits.abilities,
+    woundMod
   ]);
 
   useEffect(() => {
@@ -193,6 +198,33 @@ export function GameMode({
       active = false;
     };
   }, [character.meta.chronicleId]);
+
+  useEffect(() => {
+    const chronicleId = character.meta.chronicleId;
+    if (!chronicleId) {
+      setInitiativeResult(null);
+      return;
+    }
+    let active = true;
+    const loadInitiative = async () => {
+      try {
+        const combat = await api.get<CombatStateDto>(`/chronicles/${chronicleId}/combat`);
+        if (!active) return;
+        const stored = combat?.initiatives?.[character.uuid];
+        setInitiativeResult(stored ? stored.total : null);
+      } catch {
+        if (active) {
+          setInitiativeResult((prev) => prev ?? null);
+        }
+      }
+    };
+    loadInitiative();
+    const interval = window.setInterval(loadInitiative, 5000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [character.meta.chronicleId, character.uuid]);
 
   useEffect(() => {
     return () => {
@@ -281,7 +313,7 @@ export function GameMode({
     });
   };
 
-  const handleRollInitiative = () => {
+  const rollInitiative = (ignoreWoundPenalty = false) => {
     if (initiativeAnimTimeoutRef.current) {
       window.clearTimeout(initiativeAnimTimeoutRef.current);
     }
@@ -293,12 +325,26 @@ export function GameMode({
     const wits = totalFor(character.traits.attributes["wits"]);
     const base = dexterity + wits;
     const roll = 1 + Math.floor(Math.random() * 10);
-    const total = base + roll;
+    const appliedWound = ignoreWoundPenalty ? 0 : woundMod;
+    const baseForCombat = base + appliedWound;
+    const total = baseForCombat + roll;
+    const initiative: CombatInitiativeDto = {
+      dexterity,
+      wits,
+      base: baseForCombat,
+      roll,
+      total
+    };
     setInitiativeResult(total);
 
     const characterName = character.meta.name?.trim() || "(Без имени)";
     const playerName = character.meta.playerName?.trim() || "Неизвестный игрок";
-    const message = `Игрок ${playerName}, персонаж ${characterName}, бросил инициативу: Ловкость ${dexterity} + Смекалка ${wits} + d10(${roll}) = ${total}.`;
+    const woundLabel = ignoreWoundPenalty
+      ? " без штрафа ранений"
+      : woundMod !== 0
+        ? ` + штраф ранений ${woundMod}`
+        : "";
+    const message = `Игрок ${playerName}, персонаж ${characterName}, бросил инициативу: Ловкость ${dexterity} + Смекалка ${wits} + d10(${roll})${woundLabel} = ${total}.`;
 
     logChronicleEvent({
       type: "initiative_roll",
@@ -311,10 +357,32 @@ export function GameMode({
         wits,
         base,
         roll,
-        total
+        total,
+        woundMod: appliedWound,
+        ignoreWoundPenalty
       }
     });
+
+    const chronicleId = character.meta.chronicleId;
+    if (chronicleId) {
+      api
+        .post<{ characterUuid: string; initiative: CombatInitiativeDto }>(
+          `/chronicles/${chronicleId}/combat/initiative`,
+          { characterUuid: character.uuid, initiative }
+        )
+        .then((response) => {
+          const stored = response?.initiative?.total;
+          if (typeof stored === "number") {
+            setInitiativeResult(stored);
+          }
+        })
+        .catch(() => {
+          pushToast("Не удалось сохранить инициативу для боя", "error");
+        });
+    }
   };
+  const handleRollInitiative = () => rollInitiative(false);
+  const handleRollInitiativeNoWound = () => rollInitiative(true);
 
   const handleAvatarFile = async (file?: File | null) => {
     if (!file) return;
@@ -524,10 +592,18 @@ export function GameMode({
       const wits = Number(data.wits ?? 0);
       const roll = Number(data.roll ?? 0);
       const total = Number(data.total ?? dexterity + wits + roll);
+      const woundMod = Number(data.woundMod ?? 0);
+      const ignoreWoundPenalty = Boolean(data.ignoreWoundPenalty ?? false);
+      const woundLabel = ignoreWoundPenalty
+        ? " без штрафа ранений"
+        : woundMod !== 0
+          ? ` + штраф ранений ${woundMod}`
+          : "";
       return (
         <span className="log-text">
           Игрок <strong>{playerName}</strong>, персонаж <strong>{characterName}</strong>, бросил
-          инициативу: Ловкость {dexterity} + Смекалка {wits} + d10({roll}) ={" "}
+          инициативу: Ловкость {dexterity} + Смекалка {wits} + d10({roll})
+          {woundLabel} ={" "}
           <span className="log-success-count success">{total}</span>.
         </span>
       );
@@ -933,15 +1009,16 @@ export function GameMode({
                     <>
                       Выбор: <strong>{selectedAttributeLabel}</strong> +{" "}
                       <strong>{selectedAbilityLabel}</strong>
+                      {woundMod !== 0 ? ` (штраф ранений ${woundMod})` : ""}.
                     </>
                   ) : (
-                    "Кликните по атрибуту и способности, чтобы подставить кубики"
+                    "Кликните по атрибуту и способности, чтобы подставить кубики."
                   )}
                 </div>
               </div>
-              {rollResult && (
-                <div className={`dice-result ${rollResult.status} ${diceRolling ? "is-rolling" : ""}`}>
-                  <div className="dice-values">
+            {rollResult && (
+              <div className={`dice-result ${rollResult.status} ${diceRolling ? "is-rolling" : ""}`}>
+                <div className="dice-values">
                     {rollResult.values.map((value, index) => {
                       const isSuccess = value >= diceDifficulty;
                       const isOne = value === 1;
@@ -977,13 +1054,33 @@ export function GameMode({
                 </span>
                 Инициатива
               </div>
-              <button type="button" className="initiative-button" onClick={handleRollInitiative}>
-                Бросить
-              </button>
+              <div className="initiative-actions">
+                <button
+                  type="button"
+                  className="icon-button initiative-roll-button"
+                  onClick={handleRollInitiative}
+                  title="Бросить"
+                  aria-label="Бросить"
+                >
+                  ⚡
+                </button>
+                <button
+                  type="button"
+                  className="icon-button initiative-roll-button"
+                  onClick={handleRollInitiativeNoWound}
+                  title="Бросить без штрафа ранений"
+                  aria-label="Бросить без штрафа ранений"
+                >
+                  🩹
+                </button>
+              </div>
               <div className={`initiative-value ${initiativeRolling ? "is-rolling" : ""}`}>
                 {initiativeResult === null ? "—" : initiativeResult}
               </div>
-              <div className="initiative-formula">Ловкость + Смекалка + d10</div>
+                <div className="initiative-formula">
+                  Ловкость + Смекалка + d10
+                  {woundMod !== 0 ? ` + штраф ранений ${woundMod}` : ""}
+                </div>
             </div>
           </div>
         </div>

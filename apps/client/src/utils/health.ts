@@ -19,9 +19,9 @@ export function healthFromTrack(track: HealthState[]) {
 }
 
 export function woundPenalty(total: number) {
-  if (total <= 0) return 0;
-  if (total <= 2) return -1;
-  if (total <= 4) return -2;
+  if (total <= 1) return 0;
+  if (total <= 3) return -1;
+  if (total <= 5) return -2;
   if (total <= 6) return -5;
   return -5;
 }

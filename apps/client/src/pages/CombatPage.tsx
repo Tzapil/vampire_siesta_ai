@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type {
@@ -11,7 +11,7 @@ import type {
 } from "../api/types";
 import { useDictionaries } from "../context/DictionariesContext";
 import { useToast } from "../context/ToastContext";
-import { buildHealthTrack } from "../utils/health";
+import { buildHealthTrack, woundPenalty } from "../utils/health";
 
 type Participant =
   | {
@@ -25,6 +25,7 @@ type Participant =
       health: { bashing: number; lethal: number; aggravated: number };
       dexterity: number;
       wits: number;
+      woundMod: number;
       initiative?: CombatInitiativeDto;
       creationFinished: boolean;
     }
@@ -34,6 +35,7 @@ type Participant =
       name: string;
       dexterity: number;
       wits: number;
+      woundMod: number;
       health: { bashing: number; lethal: number; aggravated: number };
       initiative?: CombatInitiativeDto;
       dead: boolean;
@@ -119,6 +121,24 @@ export default function CombatPage() {
     };
   }, [id, pushToast]);
 
+  useEffect(() => {
+    if (!id) return;
+    let active = true;
+    const refreshCombat = async () => {
+      try {
+        const combatData = await api.get<CombatStateDto>(`/chronicles/${id}/combat`);
+        if (active) setCombat(combatData);
+      } catch {
+        // silent
+      }
+    };
+    const interval = window.setInterval(refreshCombat, 5000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [id]);
+
   const participants = useMemo<Participant[]>(() => {
     if (!combat?.active) {
       return [];
@@ -128,37 +148,45 @@ export default function CombatPage() {
       .filter((character) => character.creationFinished)
       .map((character) => {
         const name = character.meta?.name?.trim() || "(Без имени)";
-        const playerName = character.meta?.playerName?.trim() || "—";
-      const clanLabel =
-        dictionaries.clans.find((item) => item.key === character.meta?.clanKey)?.labelRu || "—";
-      const dexterity = totalFor(character.traits?.attributes?.dexterity);
-      const wits = totalFor(character.traits?.attributes?.wits);
+        const playerName = character.meta?.playerName?.trim() || "Неизвестный игрок";
+        const clanLabel =
+          dictionaries.clans.find((item) => item.key === character.meta?.clanKey)?.labelRu || "—";
+        const dexterity = totalFor(character.traits?.attributes?.dexterity);
+        const wits = totalFor(character.traits?.attributes?.wits);
+        const health = character.resources?.health ?? { bashing: 0, lethal: 0, aggravated: 0 };
+        const woundMod = woundPenalty(health.bashing + health.lethal + health.aggravated);
         return {
-        type: "character",
-        id: character.uuid,
-        name,
-        avatarUrl: character.meta?.avatarUrl,
-        playerName,
-        clanLabel,
-        generation: character.meta?.generation ?? null,
-        health: character.resources?.health ?? { bashing: 0, lethal: 0, aggravated: 0 },
-        dexterity,
-        wits,
-        initiative: initiatives?.[character.uuid],
-        creationFinished: character.creationFinished
+          type: "character",
+          id: character.uuid,
+          name,
+          avatarUrl: character.meta?.avatarUrl,
+          playerName,
+          clanLabel,
+          generation: character.meta?.generation ?? null,
+          health,
+          dexterity,
+          wits,
+          woundMod,
+          initiative: initiatives?.[character.uuid],
+          creationFinished: character.creationFinished
         };
       });
     const enemyEntries: Participant[] =
-      combat?.enemies?.map((enemy) => ({
-        type: "enemy",
-        id: enemy._id,
-        name: enemy.name,
-        dexterity: enemy.dexterity ?? 0,
-        wits: enemy.wits ?? 0,
-        health: enemy.health ?? { bashing: 0, lethal: 0, aggravated: 0 },
-        initiative: enemy.initiative,
-        dead: enemy.dead ?? false
-      })) ?? [];
+      combat?.enemies?.map((enemy) => {
+        const health = enemy.health ?? { bashing: 0, lethal: 0, aggravated: 0 };
+        const woundMod = woundPenalty(health.bashing + health.lethal + health.aggravated);
+        return {
+          type: "enemy",
+          id: enemy._id,
+          name: enemy.name,
+          dexterity: enemy.dexterity ?? 0,
+          wits: enemy.wits ?? 0,
+          health,
+          woundMod,
+          initiative: enemy.initiative,
+          dead: enemy.dead ?? false
+        };
+      }) ?? [];
 
     const all = [...characterEntries, ...enemyEntries];
     return all.sort((a, b) => {
@@ -174,7 +202,7 @@ export default function CombatPage() {
 
   const isActive = combat?.active ?? false;
 
-  const rollInitiative = (dexterity: number, wits: number): CombatInitiativeDto => {
+  const rollInitiative = (dexterity: number, wits: number, woundMod = 0): CombatInitiativeDto => {
     const base = dexterity + wits;
     const roll = 1 + Math.floor(Math.random() * 10);
     return {
@@ -182,13 +210,13 @@ export default function CombatPage() {
       wits,
       base,
       roll,
-      total: base + roll
+      total: base + roll + woundMod
     };
   };
 
   const handleCharacterInitiative = async (participant: Participant) => {
     if (participant.type !== "character" || !id) return;
-    const initiative = rollInitiative(participant.dexterity, participant.wits);
+    const initiative = rollInitiative(participant.dexterity, participant.wits, participant.woundMod);
     try {
       const result = await api.post<{ characterUuid: string; initiative: CombatInitiativeDto }>(
         `/chronicles/${id}/combat/initiative`,
@@ -211,10 +239,11 @@ export default function CombatPage() {
     enemyId: string,
     enemyName: string,
     dexterity: number,
-    wits: number
+    wits: number,
+    woundMod = 0
   ) => {
     if (!id) return;
-    const initiative = rollInitiative(dexterity ?? 0, wits ?? 0);
+    const initiative = rollInitiative(dexterity ?? 0, wits ?? 0, woundMod);
     try {
       const updated = await api.patch<CombatEnemyDto>(
         `/chronicles/${id}/combat/enemies/${enemyId}`,
@@ -230,8 +259,8 @@ export default function CombatPage() {
       );
       logCombatEvent({
         type: "combat_enemy_initiative",
-        message: `Враг ${enemyName}, бросил инициативу: Ловкость ${initiative.dexterity} + Смекалка ${initiative.wits} + d10(${initiative.roll}) = ${initiative.total}.`,
-        data: { enemyId, enemyName, initiative }
+        message: `Враг ${enemyName}, бросил инициативу: Ловкость ${initiative.dexterity} + Смекалка ${initiative.wits} + d10(${initiative.roll})${woundMod ? ` + штраф ранений ${woundMod}` : ""} = ${initiative.total}.`,
+        data: { enemyId, enemyName, initiative, woundMod }
       });
     } catch (err: any) {
       pushToast(err?.message ?? "Не удалось бросить инициативу", "error");
@@ -462,9 +491,10 @@ export default function CombatPage() {
             const isDead = participant.type === "enemy" ? participant.dead : false;
             const initiative = participant.initiative;
             const initiativeLabel = initiative ? initiative.total : "—";
+            const woundLabel = participant.woundMod ? ` + штраф ранений ${participant.woundMod}` : "";
             const initiativeMeta = initiative
-              ? `${initiative.base} + d10(${initiative.roll})`
-              : "Ловкость + Смекалка";
+              ? `${initiative.base} + d10(${initiative.roll})${woundLabel}`
+              : `Ловкость + Смекалка${woundLabel}`;
 
             const avatarLetter =
               participant.name && participant.name !== "(Без имени)"
@@ -530,25 +560,30 @@ export default function CombatPage() {
                     {participant.type === "character" ? (
                       <button
                         type="button"
-                        className="initiative-button"
+                        className="icon-button initiative-roll-button"
                         onClick={() => handleCharacterInitiative(participant)}
+                        title="Бросить"
+                        aria-label="Бросить"
                       >
-                        Инициатива
+                        ⚡
                       </button>
                     ) : (
                       <button
                         type="button"
-                        className="initiative-button"
+                        className="icon-button initiative-roll-button"
                         onClick={() =>
                           handleEnemyInitiative(
                             participant.id,
                             participant.name,
                             participant.dexterity,
-                            participant.wits
+                            participant.wits,
+                            participant.woundMod
                           )
                         }
+                        title="Бросить"
+                        aria-label="Бросить"
                       >
-                        Инициатива
+                        ⚡
                       </button>
                     )}
                   </div>
@@ -675,3 +710,19 @@ export default function CombatPage() {
     </section>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

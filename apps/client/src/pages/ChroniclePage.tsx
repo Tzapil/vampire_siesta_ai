@@ -161,10 +161,18 @@ export default function ChroniclePage() {
       const wits = Number(data.wits ?? 0);
       const roll = Number(data.roll ?? 0);
       const total = Number(data.total ?? dexterity + wits + roll);
+      const woundMod = Number(data.woundMod ?? 0);
+      const ignoreWoundPenalty = Boolean(data.ignoreWoundPenalty ?? false);
+      const woundLabel = ignoreWoundPenalty
+        ? " без штрафа ранений"
+        : woundMod !== 0
+          ? ` + штраф ранений ${woundMod}`
+          : "";
       return (
         <span className="log-text">
           Игрок <strong>{playerName}</strong>, персонаж <strong>{characterName}</strong>, бросил
-          инициативу: Ловкость {dexterity} + Смекалка {wits} + d10({roll}) ={" "}
+          инициативу: Ловкость {dexterity} + Смекалка {wits} + d10({roll})
+          {woundLabel} ={" "}
           <span className="log-success-count success">{total}</span>.
         </span>
       );
