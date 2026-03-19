@@ -12,11 +12,13 @@ RUN npm install
 FROM deps AS client-build
 
 COPY apps/client apps/client
+ENV NODE_OPTIONS=--max-old-space-size=384
 RUN npm -w apps/client run build
 
 FROM deps AS server-build
 
 COPY apps/server apps/server
+ENV NODE_OPTIONS=--max-old-space-size=384
 RUN npm -w apps/server run build
 
 FROM node:20-alpine AS runner
