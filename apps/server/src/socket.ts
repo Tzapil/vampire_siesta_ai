@@ -8,7 +8,6 @@ import {
   computeFreebieSpent,
   getLayer,
   getStepForPath,
-  isPatchAllowed,
   loadDictionaries,
   recalcFlawFreebie,
   setLayer,
@@ -16,6 +15,7 @@ import {
   WIZARD_STEPS,
   validateRanges
 } from "./validation/characterValidation";
+import { characterValidationService } from "./validation/service";
 
 export type Patch = {
   characterUuid: string;
@@ -31,6 +31,10 @@ type PatchResult =
 
 function reject(message: string, path = "patch"): PatchResult {
   return { ok: false, errors: [{ path, message }] };
+}
+
+function rejectIssues(issues: Array<{ path: string; message: string }>): PatchResult {
+  return { ok: false, errors: issues };
 }
 
 export function registerSocket(io: Server) {
@@ -50,12 +54,16 @@ export function registerSocket(io: Server) {
 
     socket.on("patch", async (patch: Patch, callback: (result: PatchResult) => void) => {
       try {
-        if (!patch || patch.op !== "set") {
+        if (!patch || typeof patch !== "object") {
           callback(reject("Неверный формат патча"));
           return;
         }
         if (!patch.characterUuid || typeof patch.characterUuid !== "string") {
           callback(reject("Не указан персонаж"));
+          return;
+        }
+        if (patch.op !== "set") {
+          callback(reject("Неверный формат патча"));
           return;
         }
         if (!patch.path || typeof patch.path !== "string") {
@@ -78,121 +86,26 @@ export function registerSocket(io: Server) {
           return;
         }
 
-        if (!isPatchAllowed(patch.path, character.creationFinished)) {
-          callback(reject("Недопустимый путь для изменения", patch.path));
-          return;
-        }
-
         const dict = await loadDictionaries();
 
-        const traitMatch = patch.path.match(
-          /^traits\.(attributes|abilities|disciplines|backgrounds|virtues)\.([^.]+)\.(base|freebie|storyteller)$/
-        );
-        if (traitMatch) {
-          const [, group, key, layerName] = traitMatch;
-          const exists = (() => {
-            if (group === "attributes") return dict.attributes.some((item) => item.key === key);
-            if (group === "abilities") return dict.abilities.some((item) => item.key === key);
-            if (group === "disciplines") return dict.disciplines.some((item) => item.key === key);
-            if (group === "backgrounds") return dict.backgrounds.some((item) => item.key === key);
-            if (group === "virtues") return dict.virtues.some((item) => item.key === key);
-            return false;
-          })();
-          if (!exists) {
-            callback(reject("Неизвестный ключ справочника", patch.path));
-            return;
-          }
+        const preValidation = await characterValidationService.validatePatchStructure({
+          patch,
+          character,
+          dictionaries: dict,
+          chronicleExists: async (chronicleId) => Boolean(await ChronicleModel.exists({ _id: chronicleId }))
+        });
+        if (preValidation.issues.length > 0 || !preValidation.patch) {
+          callback(rejectIssues(preValidation.issues.map((item) => ({ path: item.path, message: item.message }))));
+          return;
+        }
+        patch = preValidation.patch;
 
-          if (typeof patch.value !== "number" || Number.isNaN(patch.value)) {
-            callback(reject("Значение должно быть числом", patch.path));
-            return;
-          }
-
-          if (layerName === "freebie" && patch.value < 0) {
-            callback(reject("Свободные очки не могут быть отрицательными", patch.path));
-            return;
-          }
-
-          if (layerName === "base") {
-            if (group === "attributes") {
-              const clan = dict.clans.get(character.meta?.clanKey ?? "");
-              const fixedAppearance = clan?.rules?.appearanceFixedTo === 0;
-              const minBase = key === "appearance" && fixedAppearance ? 0 : 1;
-              if (patch.value < minBase || patch.value > 5) {
-                callback(reject("Недопустимая база атрибута", patch.path));
-                return;
-              }
-            } else if (group === "virtues") {
-              if (patch.value < 1 || patch.value > 5) {
-                callback(reject("Недопустимая база добродетели", patch.path));
-                return;
-              }
-            } else if (group === "disciplines") {
-              if (patch.value < 0 || patch.value > 3) {
-                callback(reject("База дисциплины должна быть от 0 до 3", patch.path));
-                return;
-              }
-            } else if (patch.value < 0 || patch.value > 5) {
-              callback(reject("Недопустимая база", patch.path));
-              return;
-            }
-          }
-
+        if (preValidation.traitPatch) {
+          const { group, key } = preValidation.traitPatch;
           const container = character.traits?.[group as keyof typeof character.traits];
           if (container) {
             const current = getLayer(container, key);
             setLayer(container, key, current);
-          }
-        }
-
-        if (patch.path.startsWith("creation.attributesPriority") || patch.path.startsWith("creation.abilitiesPriority")) {
-          const allowed = new Set(["primary", "secondary", "tertiary"]);
-          if (typeof patch.value !== "string" || !allowed.has(patch.value)) {
-            callback(reject("Недопустимое значение приоритета", patch.path));
-            return;
-          }
-        }
-
-        if (patch.path.startsWith("creation.freebieBuys.")) {
-          if (typeof patch.value !== "number" || patch.value < 0 || !Number.isInteger(patch.value)) {
-            callback(reject("Значение должно быть неотрицательным целым", patch.path));
-            return;
-          }
-        }
-
-        if (patch.path.startsWith("meta.sectKey")) {
-          if (typeof patch.value !== "string" || !dict.sects.has(patch.value)) {
-            callback(reject("Недопустимая секта", patch.path));
-            return;
-          }
-        }
-
-        if (patch.path.startsWith("meta.chronicleId")) {
-          const exists = await ChronicleModel.exists({ _id: patch.value });
-          if (!exists) {
-            callback(reject("Хроника не найдена", patch.path));
-            return;
-          }
-        }
-
-        if (patch.path.startsWith("meta.natureKey")) {
-          if (typeof patch.value !== "string" || !dict.natures.has(patch.value)) {
-            callback(reject("Недопустимая натура", patch.path));
-            return;
-          }
-        }
-
-        if (patch.path.startsWith("meta.demeanorKey")) {
-          if (typeof patch.value !== "string" || !dict.demeanors.has(patch.value)) {
-            callback(reject("Недопустимое поведение", patch.path));
-            return;
-          }
-        }
-
-        if (patch.path === "traits.merits" || patch.path === "traits.flaws") {
-          if (!Array.isArray(patch.value) || patch.value.some((item) => typeof item !== "string")) {
-            callback(reject("Неверный формат списка", patch.path));
-            return;
           }
         }
 

@@ -16,12 +16,16 @@
 ```env
 PORT=4000
 MONGO_URL=mongodb://localhost:27017/siesta
+VALIDATION_ENGINE_V2=1
+VALIDATION_SIDE_BY_SIDE=0
 ```
 
 Дополнительно:
 
 - `CLIENT_DIST_PATH` — путь до собранного клиента. Нужен, если вы запускаете сервер НЕ из корня репозитория.
 - `NODE_ENV=production` — включает раздачу клиента сервером.
+- `VALIDATION_ENGINE_V2` — переключает новый модульный валидатор (`1` по умолчанию, `0` для rollback на legacy).
+- `VALIDATION_SIDE_BY_SIDE` — включает теневое сравнение legacy/v2 и лог mismatch в серверных логах.
 
 ## Локальный запуск (dev)
 
