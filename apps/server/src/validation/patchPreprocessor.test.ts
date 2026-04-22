@@ -29,6 +29,24 @@ test("preprocessPatch rejects disallowed paths", () => {
   assert.equal(result.issues[0].code, "patch.path.disallowed");
 });
 
+test("preprocessPatch rejects playerName updates from client", () => {
+  const result = preprocessPatch(
+    {
+      op: "set",
+      characterUuid: "uuid-1",
+      baseVersion: 1,
+      path: "meta.playerName",
+      value: "Другой игрок"
+    },
+    false
+  );
+  assert.equal(result.ok, false);
+  if (result.ok) {
+    throw new Error("expected validation failure");
+  }
+  assert.equal(result.issues[0].code, "patch.path.disallowed");
+});
+
 test("parseTraitPatchPath extracts trait patch descriptor", () => {
   const parsed = parseTraitPatchPath("traits.attributes.strength.base");
   assert.deepEqual(parsed, {

@@ -6,6 +6,29 @@
   maxValue?: number;
 };
 
+export type AuthProviderId = "google" | "yandex";
+
+export type AuthProviderOptionDto = {
+  id: AuthProviderId;
+  label: string;
+  startPath: string;
+};
+
+export type AuthUserDto = {
+  id: string;
+  email: string;
+  role: "player" | "storyteller" | "admin";
+  status: "active" | "blocked";
+  displayName: string;
+  providers: Array<{
+    provider: AuthProviderId;
+    linkedAt: string;
+  }>;
+  lastSeenAt: string;
+  lastLoginAt: string;
+  avatarUrl: string | null;
+};
+
 export type ClanDto = DictItem & {
   disciplineKeys: string[];
   rules?: { appearanceFixedTo?: number };
@@ -45,6 +68,8 @@ export type ChronicleDto = {
   _id: string;
   name: string;
   description?: string;
+  createdByUserId?: string;
+  createdByDisplayName?: string;
   deleted?: boolean;
 };
 
@@ -68,6 +93,8 @@ export type ChronicleImageDto = {
 export type CharacterSummaryDto = {
   uuid: string;
   creationFinished: boolean;
+  createdByUserId?: string;
+  createdByDisplayName?: string;
   meta: {
     name: string;
     chronicleId: string;
@@ -123,6 +150,8 @@ export type CharacterDto = {
   uuid: string;
   version: number;
   creationFinished: boolean;
+  createdByUserId?: string;
+  createdByDisplayName?: string;
   deleted?: boolean;
   meta: {
     name: string;

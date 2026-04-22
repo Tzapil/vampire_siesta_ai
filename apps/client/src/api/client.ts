@@ -25,6 +25,7 @@ async function parseJson(res: Response) {
 
 export async function apiRequest<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
+    credentials: "same-origin",
     headers: {
       "Content-Type": "application/json",
       ...(options?.headers ?? {})
@@ -37,6 +38,9 @@ export async function apiRequest<T>(path: string, options?: RequestInit): Promis
   if (!res.ok) {
     const message = (data as ApiErrorPayload)?.message || "Ошибка запроса";
     const errors = (data as ApiErrorPayload)?.errors;
+    if (res.status === 401 && typeof window !== "undefined") {
+      window.dispatchEvent(new Event("vs:auth-unauthorized"));
+    }
     throw new ApiError(message, res.status, errors);
   }
 

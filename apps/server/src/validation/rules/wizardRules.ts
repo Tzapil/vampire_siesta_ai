@@ -499,7 +499,7 @@ export function getStepForPath(path: string, currentStep?: number) {
 
 export function isPatchAllowed(path: string, creationFinished: boolean) {
   const wizardAllowed = [
-    /^meta\.(name|playerName|clanKey|generation|chronicleId|sectKey|natureKey|demeanorKey|sire|concept)$/,
+    /^meta\.(name|clanKey|generation|chronicleId|sectKey|natureKey|demeanorKey|sire|concept)$/,
     /^traits\.(attributes|abilities|disciplines|backgrounds|virtues)\.[^.]+\.base$/,
     /^traits\.(attributes|abilities|disciplines|backgrounds|virtues)\.[^.]+\.freebie$/,
     /^traits\.merits$/,

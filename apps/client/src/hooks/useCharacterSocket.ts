@@ -29,6 +29,11 @@ export function useCharacterSocket(
     onReject?: (errors: Array<{ path: string; message: string }>) => void;
   }
 ) {
+  const notifyUnauthorized = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("vs:auth-unauthorized"));
+    }
+  }, []);
   const socketRef = useRef<Socket | null>(null);
   const onPatchAppliedRef = useRef(options?.onPatchApplied);
   const onResyncRef = useRef(options?.onResync);
@@ -50,7 +55,10 @@ export function useCharacterSocket(
   useEffect(() => {
     if (!uuid) return;
 
-    const socket = io({ query: { uuid } });
+    const socket = io({
+      query: { uuid },
+      withCredentials: true
+    });
     socketRef.current = socket;
 
     socket.on("patchApplied", (payload: PatchAppliedPayload) => {
@@ -64,13 +72,21 @@ export function useCharacterSocket(
       onResyncRef.current?.(payload);
     });
 
+    socket.on("auth:error", notifyUnauthorized);
+    socket.on("connect_error", (error) => {
+      const message = String(error?.message ?? "").toLowerCase();
+      if (message.includes("unauthorized") || message.includes("автор")) {
+        notifyUnauthorized();
+      }
+    });
+
     socket.emit("join", { uuid });
 
     return () => {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [uuid]);
+  }, [notifyUnauthorized, uuid]);
 
   const emitNext = useCallback(() => {
     if (pendingRef.current) return;

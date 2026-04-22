@@ -1,4 +1,6 @@
-﻿import { Server } from "socket.io";
+﻿import { Server, Socket } from "socket.io";
+import { getAuthErrorMessage } from "./auth/errors";
+import type { AuthService } from "./auth/service";
 import { CharacterModel, ChronicleModel } from "./db";
 import { setByPath } from "./utils/setByPath";
 import {
@@ -37,8 +39,66 @@ function rejectIssues(issues: Array<{ path: string; message: string }>): PatchRe
   return { ok: false, errors: issues };
 }
 
-export function registerSocket(io: Server) {
+function getSocketMeta(socket: Socket) {
+  return {
+    ip: socket.handshake.address || undefined,
+    userAgent:
+      typeof socket.handshake.headers["user-agent"] === "string"
+        ? socket.handshake.headers["user-agent"]
+        : undefined
+  };
+}
+
+export function registerSocket(io: Server, authService: AuthService) {
+  io.use(async (socket, next) => {
+    try {
+      const resolution = await authService.resolveRequest(
+        socket.request.headers.cookie,
+        getSocketMeta(socket),
+        {
+          touchSession: true,
+          allowCookieRefresh: false
+        }
+      );
+
+      if (!resolution.auth) {
+        next(new Error(getAuthErrorMessage("unauthorized")));
+        return;
+      }
+
+      socket.data.auth = resolution.auth;
+      next();
+    } catch (error) {
+      next(error as Error);
+    }
+  });
+
   io.on("connection", (socket) => {
+    socket.use(async (_packet, next) => {
+      try {
+        const resolution = await authService.resolveRequest(
+          socket.request.headers.cookie,
+          getSocketMeta(socket),
+          {
+            touchSession: true,
+            allowCookieRefresh: false
+          }
+        );
+
+        if (!resolution.auth) {
+          socket.emit("auth:error", { message: getAuthErrorMessage("unauthorized") });
+          socket.disconnect();
+          next(new Error(getAuthErrorMessage("unauthorized")));
+          return;
+        }
+
+        socket.data.auth = resolution.auth;
+        next();
+      } catch (error) {
+        next(error as Error);
+      }
+    });
+
     const queryUuid = socket.handshake.query.uuid;
     if (typeof queryUuid === "string" && queryUuid) {
       socket.join(queryUuid);
@@ -223,4 +283,3 @@ export function registerSocket(io: Server) {
     });
   });
 }
-

@@ -7,6 +7,7 @@ import {
   CombatStateModel
 } from "../db";
 import { asyncHandler } from "../utils/asyncHandler";
+import { presentCharacterList } from "../utils/characterPresenter";
 
 const router = Router();
 const MAX_CHRONICLE_IMAGE_LENGTH = 7_000_000;
@@ -22,6 +23,12 @@ router.get(
 router.post(
   "/chronicles",
   asyncHandler(async (req, res) => {
+    const authUser = req.auth?.user;
+    if (!authUser) {
+      res.status(401).json({ message: "Требуется авторизация" });
+      return;
+    }
+
     const { name, description } = req.body ?? {};
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       res.status(400).json({ message: "Название хроники обязательно" });
@@ -34,7 +41,9 @@ router.post(
 
     const chronicle = await ChronicleModel.create({
       name: trimmedName,
-      description: trimmedDescription
+      description: trimmedDescription,
+      createdByUserId: authUser.id,
+      createdByDisplayName: authUser.displayName
     });
 
     res.status(201).json(chronicle);
@@ -77,7 +86,7 @@ router.get(
       deleted: false
     })
       .select(
-        "uuid meta.name meta.avatarUrl meta.playerName meta.clanKey meta.sectKey meta.generation creationFinished meta.chronicleId traits.attributes resources.health"
+        "uuid createdByUserId createdByDisplayName meta.name meta.avatarUrl meta.playerName meta.clanKey meta.sectKey meta.generation creationFinished meta.chronicleId traits.attributes resources.health"
       )
       .lean();
 
@@ -90,7 +99,7 @@ router.get(
       return nameA.localeCompare(nameB, "ru");
     });
 
-    res.json(sorted);
+    res.json(await presentCharacterList(sorted));
   })
 );
 
@@ -352,4 +361,3 @@ router.delete(
 );
 
 export default router;
-

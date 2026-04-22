@@ -39,6 +39,9 @@ const CharacterSchema = new Schema(
   {
     uuid: { type: String, required: true, unique: true, index: true },
 
+    createdByUserId: { type: Schema.Types.ObjectId, ref: "User", required: false, index: true },
+    createdByDisplayName: { type: String, required: false, default: "", trim: true },
+
     version: { type: Number, required: true, default: 1 },
 
     deleted: { type: Boolean, required: true, default: false, index: true },
@@ -108,4 +111,3 @@ const CharacterSchema = new Schema(
 );
 
 export const CharacterModel = model("Character", CharacterSchema);
-

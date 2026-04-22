@@ -9,6 +9,7 @@ import {
   VirtueModel
 } from "../db";
 import { asyncHandler } from "../utils/asyncHandler";
+import { presentCharacter } from "../utils/characterPresenter";
 import { generateUuid } from "../utils/uuid";
 import { deriveFromGeneration } from "../utils/derived";
 import {
@@ -19,6 +20,7 @@ import {
   validateAllWizardSteps,
   validateWizardStep
 } from "../validation/characterValidation";
+import { sanitizeCharacterForExport } from "../utils/characterTransfer";
 
 const router = Router();
 
@@ -28,11 +30,49 @@ function buildLayeredRecord(keys: string[], base: number) {
   );
 }
 
+function ensurePlayerName(character: any, authUser: { id: string; displayName: string }) {
+  const currentValue = typeof character.meta?.playerName === "string" ? character.meta.playerName.trim() : "";
+  if (currentValue) {
+    return;
+  }
+
+  const ownerId = character.createdByUserId ? String(character.createdByUserId) : "";
+  const ownerDisplayName =
+    typeof character.createdByDisplayName === "string"
+      ? character.createdByDisplayName.trim()
+      : "";
+  const canUseAuthUserAsOwner = !ownerId || ownerId === authUser.id;
+  const playerName = ownerDisplayName || (canUseAuthUserAsOwner ? authUser.displayName : "");
+
+  if (!playerName) {
+    return;
+  }
+
+  if (canUseAuthUserAsOwner && !ownerId) {
+    character.createdByUserId = authUser.id;
+  }
+
+  if (canUseAuthUserAsOwner && !ownerDisplayName) {
+    character.createdByDisplayName = authUser.displayName;
+  }
+
+  character.meta = {
+    ...(character.meta ?? {}),
+    playerName
+  };
+}
+
 router.post(
   "/characters",
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const authUser = req.auth?.user;
+    if (!authUser) {
+      res.status(401).json({ message: "Требуется авторизация" });
+      return;
+    }
+
     const requestedChronicleId =
-      typeof _req.body?.chronicleId === "string" ? _req.body.chronicleId.trim() : "";
+      typeof req.body?.chronicleId === "string" ? req.body.chronicleId.trim() : "";
     let chronicle = null;
     if (requestedChronicleId) {
       chronicle = await ChronicleModel.findById(requestedChronicleId);
@@ -43,7 +83,11 @@ router.post(
     } else {
       chronicle = await ChronicleModel.findOne({ name: "Без хроники" });
       if (!chronicle) {
-        chronicle = await ChronicleModel.create({ name: "Без хроники" });
+        chronicle = await ChronicleModel.create({
+          name: "Без хроники",
+          createdByUserId: authUser.id,
+          createdByDisplayName: authUser.displayName
+        });
       }
     }
 
@@ -73,11 +117,13 @@ router.post(
 
     const character = await CharacterModel.create({
       uuid: generateUuid(),
+      createdByUserId: authUser.id,
+      createdByDisplayName: authUser.displayName,
       creationFinished: false,
       wizard: { currentStep: 1 },
       meta: {
         name: "",
-        playerName: "",
+        playerName: authUser.displayName,
         concept: "",
         sire: "",
         chronicleId: chronicle._id,
@@ -130,7 +176,7 @@ router.get(
       return;
     }
 
-    res.json(character);
+    res.json(await presentCharacter(character));
   })
 );
 
@@ -165,14 +211,20 @@ router.get(
       return;
     }
 
-    const { uuid, _id, __v, ...rest } = character as any;
-    res.json(rest);
+    const presented = await presentCharacter(character);
+    res.json(sanitizeCharacterForExport((presented ?? character) as Record<string, unknown>));
   })
 );
 
 router.post(
   "/characters/:uuid/import",
   asyncHandler(async (req, res) => {
+    const authUser = req.auth?.user;
+    if (!authUser) {
+      res.status(401).json({ message: "Требуется авторизация" });
+      return;
+    }
+
     const character = await CharacterModel.findOne({ uuid: req.params.uuid, deleted: false });
     if (!character) {
       res.status(404).json({ message: "Персонаж не найден" });
@@ -188,10 +240,19 @@ router.post(
     delete payload.uuid;
     delete payload._id;
     delete payload.__v;
+    delete payload.createdByUserId;
+    delete payload.createdByDisplayName;
+
+    payload.meta = {
+      ...(payload.meta ?? {}),
+      playerName: authUser.displayName
+    };
 
     character.overwrite({
       ...payload,
       uuid: character.uuid,
+      createdByUserId: authUser.id,
+      createdByDisplayName: authUser.displayName,
       deleted: false,
       deletedAt: undefined,
       version: character.version
@@ -227,11 +288,19 @@ router.post(
 router.post(
   "/characters/:uuid/wizard/next",
   asyncHandler(async (req, res) => {
+    const authUser = req.auth?.user;
+    if (!authUser) {
+      res.status(401).json({ message: "Требуется авторизация" });
+      return;
+    }
+
     const character = await CharacterModel.findOne({ uuid: req.params.uuid, deleted: false });
     if (!character || character.creationFinished) {
       res.status(404).json({ message: "Мастер создания недоступен" });
       return;
     }
+
+    ensurePlayerName(character, authUser);
 
     const dict = await loadDictionaries();
     const step = character.wizard?.currentStep ?? 1;
@@ -254,11 +323,19 @@ router.post(
 router.post(
   "/characters/:uuid/wizard/back",
   asyncHandler(async (req, res) => {
+    const authUser = req.auth?.user;
+    if (!authUser) {
+      res.status(401).json({ message: "Требуется авторизация" });
+      return;
+    }
+
     const character = await CharacterModel.findOne({ uuid: req.params.uuid, deleted: false });
     if (!character || character.creationFinished) {
       res.status(404).json({ message: "Мастер создания недоступен" });
       return;
     }
+
+    ensurePlayerName(character, authUser);
 
     const current = character.wizard?.currentStep ?? 1;
     const nextStep = Math.max(current - 1, 1);
@@ -273,6 +350,12 @@ router.post(
 router.post(
   "/characters/:uuid/wizard/goto",
   asyncHandler(async (req, res) => {
+    const authUser = req.auth?.user;
+    if (!authUser) {
+      res.status(401).json({ message: "Требуется авторизация" });
+      return;
+    }
+
     const character = await CharacterModel.findOne({ uuid: req.params.uuid, deleted: false });
     if (!character || character.creationFinished) {
       res.status(404).json({ message: "Мастер создания недоступен" });
@@ -286,6 +369,8 @@ router.post(
       return;
     }
 
+    ensurePlayerName(character, authUser);
+
     character.wizard = { currentStep: targetStep };
     character.version += 1;
     await character.save();
@@ -297,11 +382,19 @@ router.post(
 router.post(
   "/characters/:uuid/wizard/finish",
   asyncHandler(async (req, res) => {
+    const authUser = req.auth?.user;
+    if (!authUser) {
+      res.status(401).json({ message: "Требуется авторизация" });
+      return;
+    }
+
     const character = await CharacterModel.findOne({ uuid: req.params.uuid, deleted: false });
     if (!character || character.creationFinished) {
       res.status(404).json({ message: "Мастер создания недоступен" });
       return;
     }
+
+    ensurePlayerName(character, authUser);
 
     const dict = await loadDictionaries();
     const errors = await validateAllWizardSteps(character, dict);
@@ -346,4 +439,3 @@ router.post(
 );
 
 export default router;
-

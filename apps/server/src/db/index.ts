@@ -17,4 +17,7 @@ export {
 export { MeritModel } from "./models/Merit";
 export { FlawModel } from "./models/Flaw";
 export { CharacterModel } from "./models/Character";
-
+export { UserModel } from "./models/User";
+export { SessionModel } from "./models/Session";
+export { UserAvatarModel } from "./models/UserAvatar";
+export { OAuthFlowModel } from "./models/OAuthFlow";
