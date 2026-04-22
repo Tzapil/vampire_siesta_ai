@@ -485,9 +485,6 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
         <div className="field">
           <label>Имя игрока</label>
           <input value={character.meta.playerName || character.createdByDisplayName || ""} readOnly />
-          <small>
-            Определяется по профилю создателя персонажа и недоступно для редактирования.
-          </small>
         </div>
         <div className="field">
           <label>Клан</label>

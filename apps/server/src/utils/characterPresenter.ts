@@ -2,7 +2,7 @@ import { UserModel } from "../db";
 
 type CharacterLike = {
   createdByUserId?: unknown;
-  createdByDisplayName?: string;
+  createdByDisplayName?: string | null;
   meta?: Record<string, unknown> | null;
 };
 

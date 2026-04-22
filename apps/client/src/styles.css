@@ -1045,6 +1045,7 @@ button:disabled {
 
 .game-mode .trait-list.columns {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-items: start;
 }
 
 .game-mode .trait-row {
@@ -1071,10 +1072,13 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+  align-items: start;
 }
 
 .game-mode .merits-flaws-grid .trait-section {
   margin-bottom: 0;
+  align-self: start;
+  align-content: start;
 }
 
 .game-mode .merits-flaws-grid .trait-row {
@@ -1090,10 +1094,12 @@ button:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-top: 12px;
+  align-items: start;
 }
 
 .game-mode .notes-grid .trait-section {
   margin-bottom: 0;
+  align-self: start;
 }
 
 .game-mode .trait-row.selectable:hover {
@@ -1716,6 +1722,7 @@ button:disabled {
 
 .trait-list.columns {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
 }
 
 .trait-row {
@@ -2195,6 +2202,7 @@ button:disabled {
   gap: 12px;
   margin-top: 12px;
   margin-bottom: 16px;
+  align-items: start;
 }
 
 .wizard-priority-card {
@@ -2228,6 +2236,7 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 12px;
+  align-items: start;
 }
 
 .wizard-attr-card {
@@ -2635,6 +2644,7 @@ button:disabled {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
   margin-top: 12px;
+  align-items: start;
 }
 
 .character-card {
@@ -2704,6 +2714,7 @@ button:disabled {
   gap: 12px;
   margin-top: 12px;
   justify-items: start;
+  align-items: start;
 }
 
 .chronicle-image-card {

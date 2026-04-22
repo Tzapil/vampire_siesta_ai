@@ -16,6 +16,23 @@ test("buildAppConfig accepts a single configured provider", () => {
   assert.equal(config.auth.providers.yandex, undefined);
 });
 
+test("buildAppConfig allows startup without configured providers", () => {
+  const config = buildAppConfig({
+    MONGO_URL: "mongodb://localhost:27017/siesta"
+  });
+
+  assert.deepEqual(config.auth.providers, {});
+});
+
+test("buildAppConfig ignores redirect-only provider placeholders", () => {
+  const config = buildAppConfig({
+    MONGO_URL: "mongodb://localhost:27017/siesta",
+    GOOGLE_REDIRECT_URI: "http://localhost:5173/api/auth/google/callback"
+  });
+
+  assert.equal(config.auth.providers.google, undefined);
+});
+
 test("buildAppConfig rejects partially configured provider", () => {
   assert.throws(
     () =>

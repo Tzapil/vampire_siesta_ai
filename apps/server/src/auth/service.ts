@@ -54,6 +54,8 @@ type YandexUserInfoResponse = {
   default_avatar_id?: string;
 };
 
+type RequestHeaders = Record<string, string>;
+
 const PROVIDER_LABELS: Record<AuthProvider, string> = {
   google: "Google",
   yandex: "Yandex"
@@ -712,7 +714,7 @@ export class AuthService {
     return payload;
   }
 
-  private async getJson<T>(url: string, headers?: HeadersInit) {
+  private async getJson<T>(url: string, headers?: RequestHeaders) {
     const response = await fetch(url, { headers });
     const payload = await readJsonResponse<T>(response);
 

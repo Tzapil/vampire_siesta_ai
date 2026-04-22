@@ -24,10 +24,10 @@ SESSION_SECURE=false
 SESSION_SAMESITE=lax
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=http://localhost:5173/api/auth/google/callback
+GOOGLE_REDIRECT_URI=
 YANDEX_CLIENT_ID=
 YANDEX_CLIENT_SECRET=
-YANDEX_REDIRECT_URI=http://localhost:5173/api/auth/yandex/callback
+YANDEX_REDIRECT_URI=
 VALIDATION_ENGINE_V2=1
 VALIDATION_SIDE_BY_SIDE=0
 ```
@@ -38,7 +38,9 @@ VALIDATION_SIDE_BY_SIDE=0
 - `NODE_ENV=production` — включает раздачу клиента сервером.
 - `ALLOWED_ORIGINS` — список origin через запятую для CORS/Socket.IO. В dev обычно достаточно `http://localhost:5173`.
 - `SESSION_COOKIE_NAME`, `SESSION_TTL_DAYS`, `SESSION_SECURE`, `SESSION_SAMESITE` — параметры cookie-сессии.
-- Нужно настроить хотя бы один OAuth-провайдер: Google и/или Яндекс.
+- Сервер может стартовать и без настроенного OAuth-провайдера, но войти в приложение тогда будет нельзя.
+- Для реального входа нужно настроить хотя бы один OAuth-провайдер: Google и/или Яндекс.
+- Значения `*_REDIRECT_URI` имеют смысл только вместе с соответствующими `*_CLIENT_ID` и `*_CLIENT_SECRET`.
 - `VALIDATION_ENGINE_V2` — переключает новый модульный валидатор (`1` по умолчанию, `0` для rollback на legacy).
 - `VALIDATION_SIDE_BY_SIDE` — включает теневое сравнение legacy/v2 и лог mismatch в серверных логах.
 

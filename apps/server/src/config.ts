@@ -112,14 +112,18 @@ function readProviderConfig(
   const clientId = readOptionalString(env, `${prefix}_CLIENT_ID`);
   const clientSecret = readOptionalString(env, `${prefix}_CLIENT_SECRET`);
   const redirectUri = readOptionalString(env, `${prefix}_REDIRECT_URI`);
-  const values = [clientId, clientSecret, redirectUri];
+  const hasCredentials = Boolean(clientId || clientSecret);
 
-  if (values.every((value) => !value)) {
+  // Allow keeping redirect URI placeholders in .env.example/.env without
+  // treating the provider as partially configured until credentials are added.
+  if (!hasCredentials) {
     return null;
   }
 
-  if (values.some((value) => !value)) {
-    throw new Error(`OAuth-провайдер ${provider} настроен частично`);
+  if (!clientId || !clientSecret || !redirectUri) {
+    throw new Error(
+      `OAuth-провайдер ${provider} настроен частично: нужны ${prefix}_CLIENT_ID, ${prefix}_CLIENT_SECRET и ${prefix}_REDIRECT_URI`
+    );
   }
 
   return {
@@ -146,10 +150,6 @@ export function buildAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig 
   const sessionSameSite = readSameSite(env);
   const google = readProviderConfig(env, "google", "GOOGLE");
   const yandex = readProviderConfig(env, "yandex", "YANDEX");
-
-  if (!google && !yandex) {
-    throw new Error("Нужно настроить хотя бы один OAuth-провайдер");
-  }
 
   const sessionSecure = readBoolean(env, "SESSION_SECURE", isProd);
   if (sessionSameSite === "none" && !sessionSecure) {
