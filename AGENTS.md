@@ -19,12 +19,16 @@
   Основные страницы: логин, главная, хроника, бой, лист персонажа, storyteller view, профиль, помощь.
 - `apps/client/src/components`
   Переиспользуемые UI-компоненты, например `Wizard`, `GameMode`, `HealthTrack`.
+- `apps/client/src/components/HelpPopover.tsx`
+  Общий click-based popover для справочных описаний в UI. Отвечает за single-open поведение, закрытие по клику вне popover и позиционирование относительно строки/контрола, а не только самой кнопки.
 - `apps/client/src/context`
   Глобальное состояние через React context: auth, dictionaries, toast-уведомления, actions в заголовке.
 - `apps/client/src/hooks/useCharacterSocket.ts`
   Клиентский Socket.IO-хук для живых патчей персонажа и resync.
 - `apps/client/src/api`
   Обёртка над same-origin JSON API и общие DTO-типы.
+- `apps/client/src/utils/dictionaryHelp.ts`
+  Нормализация и сборка текста словарных подсказок из `description`, `specializationDescription`, `specializationAt`, `category`, `pageRef`.
 - `apps/server/src/index.ts`
   Bootstrap сервера: загрузка env, подключение к Mongo, создание Express app, подключение Socket.IO.
 - `apps/server/src/app.ts`
@@ -77,6 +81,10 @@
 - При `401` от API или сокета клиент диспатчит browser event `vs:auth-unauthorized`.
 - Отдельной библиотеки глобального состояния нет; основа приложения это contexts + локальный state.
 - Глобальные стили находятся в `apps/client/src/styles.css`.
+- Справочные описания словарей в UI теперь должны идти через `HelpPopover`, а не через `title`/hover tooltip.
+- `HelpPopoverGroup` гарантирует, что одновременно открыт только один popover в пределах экрана/секции.
+- Для полей, где описание зависит от выбранного значения (`секта`, `натура`, `поведение`), `HelpPopoverButton` поддерживает `showWhenEmpty`: кнопка остаётся на месте disabled и не даёт вёрстке прыгать.
+- Если нужно изменить состав текста в popover, сначала смотреть `apps/client/src/utils/dictionaryHelp.ts`, а не править `Wizard`/`GameMode` по месту.
 
 ## Заметки По Серверу
 
@@ -116,6 +124,10 @@
 - Источник данных: `data/*.json`.
 - Seed заполняет clans, disciplines, attributes, abilities, backgrounds, merits, flaws, natures, demeanors, virtues, sects и generations.
 - Seed также гарантирует наличие дефолтной хроники.
+- `virtues` и `sects` больше не зашиты inline в `seed.ts`; их source of truth — `data/virtues.json` и `data/sects.json`.
+- `natures` и `demeanors` продолжают сидироваться из `data/archetypes.json`; если нужно поправить их описания, менять именно этот файл.
+- `syncByKey()` в `seed.ts` делает `deleteMany({ key: { $nin: keys } })` + `updateOne(..., { upsert: true })`, поэтому повторный `npm run seed` обновляет тексты и состав словарей в MongoDB без ручной чистки базы.
+- Для словарных описаний важен полный путь `data/*.json -> seed.ts -> /api/dictionaries/* -> DictionariesProvider -> buildDictionaryHelpText()`.
 
 ## Полезные Команды
 
@@ -138,6 +150,8 @@
 
 - UI, page flow и поведение экранов:
   `apps/client/src/pages`, `apps/client/src/components`, `apps/client/src/styles.css`
+- Поведение и визуал справочных popover:
+  `apps/client/src/components/HelpPopover.tsx`, `apps/client/src/utils/dictionaryHelp.ts`, `apps/client/src/styles.css`
 - Auth UI или session UX:
   клиентский `context/AuthContext.tsx`, страницы логина и профиля, серверные `src/auth` и `src/routes/auth.ts`
 - API-контракты или fetch-поведение:
@@ -148,6 +162,7 @@
   `apps/server/src/validation` и связанные тесты
 - Справочники и V20 reference data:
   `data/*.json`, `apps/server/src/seed.ts`, а при изменении схемы ещё и соответствующие models/routes
+- Если описание словаря не видно на клиенте, проверять не только `data/*.json`, но и `apps/server/src/routes/dictionaries.ts`: часть групп пробрасывает `description` через отдельные select-поля.
 - Форма хранения в базе:
   `apps/server/src/db/models`
 
