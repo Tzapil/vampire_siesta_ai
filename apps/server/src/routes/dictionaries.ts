@@ -1,4 +1,4 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import {
   AbilityModel,
   AttributeModel,
@@ -13,9 +13,17 @@ import {
   SectModel,
   VirtueModel
 } from "../db";
+import { getAggregatedDictionaries } from "../features/dictionaries/getAggregatedDictionaries";
 import { asyncHandler } from "../utils/asyncHandler";
 
 const router = Router();
+
+router.get(
+  "/dictionaries",
+  asyncHandler(async (_req, res) => {
+    res.json(await getAggregatedDictionaries());
+  })
+);
 
 router.get(
   "/clans",

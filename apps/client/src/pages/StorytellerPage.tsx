@@ -1,4 +1,5 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { setByPathImmutable } from "@siesta/shared";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { CharacterDto, ChronicleDto, DictItem } from "../api/types";
@@ -7,7 +8,6 @@ import { useDictionaries } from "../context/DictionariesContext";
 import { useToast } from "../context/ToastContext";
 import { useCharacterSocket } from "../hooks/useCharacterSocket";
 import { buildDictionaryHelpText } from "../utils/dictionaryHelp";
-import { setByPath } from "../utils/setByPath";
 import NotFound from "./NotFound";
 
 type TraitEntry = {
@@ -113,7 +113,7 @@ export default function StorytellerPage() {
   }, [character?.meta?.chronicleId]);
 
   const applyLocalPatch = useCallback((path: string, value: unknown) => {
-    setCharacter((prev) => (prev ? setByPath(prev, path, value) : prev));
+    setCharacter((prev) => (prev ? setByPathImmutable(prev, path, value) : prev));
   }, []);
 
   const { sendPatch } = useCharacterSocket(uuid, {
@@ -121,7 +121,7 @@ export default function StorytellerPage() {
     onPatchApplied: (payload) => {
       setCharacter((prev) => {
         if (!prev) return prev;
-        const next = setByPath(prev, payload.path, payload.value);
+        const next = setByPathImmutable(prev, payload.path, payload.value);
         return { ...next, version: payload.version };
       });
     },

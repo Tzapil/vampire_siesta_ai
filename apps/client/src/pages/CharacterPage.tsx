@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { setByPathImmutable } from "@siesta/shared";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { CharacterDto } from "../api/types";
@@ -7,7 +8,6 @@ import { Wizard } from "../components/Wizard";
 import { useToast } from "../context/ToastContext";
 import { useAppHeader } from "../context/AppHeaderContext";
 import { useCharacterSocket } from "../hooks/useCharacterSocket";
-import { setByPath } from "../utils/setByPath";
 import NotFound from "./NotFound";
 
 export default function CharacterPage() {
@@ -42,14 +42,14 @@ export default function CharacterPage() {
   const applyLocalPatch = useCallback((path: string, value: unknown) => {
     setCharacter((prev) => {
       if (!prev) return prev;
-      return setByPath(prev, path, value);
+      return setByPathImmutable(prev, path, value);
     });
   }, []);
 
   const onPatchApplied = useCallback((payload: { path: string; value: unknown; version: number }) => {
     setCharacter((prev) => {
       if (!prev) return prev;
-      const next = setByPath(prev, payload.path, payload.value);
+      const next = setByPathImmutable(prev, payload.path, payload.value);
       return { ...next, version: payload.version };
     });
   }, []);

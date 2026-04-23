@@ -1,0 +1,4 @@
+.grid-2 {
+  display: grid;
+  gap: 16px;
+}

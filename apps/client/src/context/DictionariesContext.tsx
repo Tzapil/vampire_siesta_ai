@@ -1,29 +1,8 @@
-﻿import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { api } from "../api/client";
-import type {
-  AbilityDto,
-  AttributeDto,
-  ClanDto,
-  DictItem,
-  FlawDto,
-  GenerationDto,
-  MeritDto
-} from "../api/types";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import type { AggregatedDictionariesDto } from "../api/types";
+import { fetchDictionaries } from "../features/dictionaries/api";
 
-export type Dictionaries = {
-  clans: ClanDto[];
-  disciplines: DictItem[];
-  attributes: AttributeDto[];
-  abilities: AbilityDto[];
-  backgrounds: DictItem[];
-  virtues: DictItem[];
-  merits: MeritDto[];
-  flaws: FlawDto[];
-  sects: DictItem[];
-  natures: DictItem[];
-  demeanors: DictItem[];
-  generations: GenerationDto[];
-};
+export type Dictionaries = AggregatedDictionariesDto;
 
 type DictionariesContextValue = {
   dictionaries: Dictionaries;
@@ -46,53 +25,14 @@ export function DictionariesProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
+
     async function load() {
       setLoading(true);
       setError(null);
       try {
-        const [
-          clans,
-          disciplines,
-          attributes,
-          abilities,
-          backgrounds,
-          virtues,
-          merits,
-          flaws,
-          sects,
-          natures,
-          demeanors,
-          generations
-        ] = await Promise.all([
-          api.get<ClanDto[]>("/clans"),
-          api.get<DictItem[]>("/disciplines"),
-          api.get<AttributeDto[]>("/attributes"),
-          api.get<AbilityDto[]>("/abilities"),
-          api.get<DictItem[]>("/backgrounds"),
-          api.get<DictItem[]>("/virtues"),
-          api.get<MeritDto[]>("/merits"),
-          api.get<FlawDto[]>("/flaws"),
-          api.get<DictItem[]>("/sects"),
-          api.get<DictItem[]>("/natures"),
-          api.get<DictItem[]>("/demeanors"),
-          api.get<GenerationDto[]>("/generations")
-        ]);
-
+        const nextDictionaries = await fetchDictionaries();
         if (!active) return;
-        setDictionaries({
-          clans,
-          disciplines,
-          attributes,
-          abilities,
-          backgrounds,
-          virtues,
-          merits,
-          flaws,
-          sects,
-          natures,
-          demeanors,
-          generations
-        });
+        setDictionaries(nextDictionaries);
         setLoading(false);
       } catch (err: any) {
         if (!active) return;
@@ -101,7 +41,7 @@ export function DictionariesProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    load();
+    void load();
     return () => {
       active = false;
     };
