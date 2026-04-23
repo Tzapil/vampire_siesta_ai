@@ -13,7 +13,9 @@ import type {
 } from "../api/types";
 import { useDictionaries } from "../context/DictionariesContext";
 import { useToast } from "../context/ToastContext";
+import { HelpPopoverButton, HelpPopoverGroup } from "./HelpPopover";
 import { HealthTrack } from "./HealthTrack";
+import { buildDictionaryHelpText } from "../utils/dictionaryHelp";
 import { woundPenalty } from "../utils/health";
 
 function HealthAdjustButton({
@@ -88,21 +90,6 @@ export function GameMode({
   const willpowerPercent = statPercent(resources.willpower.current, 10);
   const humanityPercent = statPercent(resources.humanity.current, 10);
   const healthPercent = statPercent(totalDamage, maxHealth);
-
-  const buildTooltip = (...parts: Array<string | undefined | null>) => {
-    const text = parts
-      .map((part) => (part ?? "").trim())
-      .filter(Boolean)
-      .join("\n");
-    return text.length > 0 ? text : null;
-  };
-
-  const renderHelpIcon = (text?: string | null) =>
-    text ? (
-      <span className="help-icon" title={text} aria-label={text}>
-        ?
-      </span>
-    ) : null;
 
   const [diceDifficulty, setDiceDifficulty] = useState(6);
   const [diceCount, setDiceCount] = useState(6);
@@ -675,13 +662,6 @@ export function GameMode({
                   const layer = values[item.key];
                   const total = totalFor(layer);
                   const maxDots = typeof item.maxValue === "number" ? item.maxValue : 5;
-                  const tooltip = buildTooltip(
-                    item.description,
-                    (item as { specializationDescription?: string }).specializationDescription,
-                    (item as { pageRef?: string }).pageRef
-                      ? `Стр. ${(item as { pageRef?: string }).pageRef}`
-                      : undefined
-                  );
                   const selectable = options?.selectable;
                   const selected = options?.selectedKey === item.key;
                   const rowClass = [
@@ -701,10 +681,14 @@ export function GameMode({
                       role={selectable ? "button" : undefined}
                       aria-pressed={selectable ? selected : undefined}
                     >
-                      <span className="trait-label">
-                        <span>{item.labelRu}</span>
-                        {renderHelpIcon(tooltip)}
-                      </span>
+                        <span className="trait-label">
+                          <span>{item.labelRu}</span>
+                          <HelpPopoverButton
+                            popoverId={`game-trait-${groupKey}-${item.key}`}
+                            text={buildDictionaryHelpText(item)}
+                            ariaLabel={`Описание: ${item.labelRu}`}
+                          />
+                        </span>
                       <DotsDisplay total={total} max={maxDots} />
                     </div>
                   );
@@ -719,76 +703,104 @@ export function GameMode({
 
   const clanLabel =
     dictionaries.clans.find((item) => item.key === character.meta.clanKey)?.labelRu ?? "—";
-  const sectLabel =
-    dictionaries.sects.find((item) => item.key === character.meta.sectKey)?.labelRu ?? "—";
-  const natureLabel =
-    dictionaries.natures.find((item) => item.key === character.meta.natureKey)?.labelRu ?? "—";
-  const demeanorLabel =
-    dictionaries.demeanors.find((item) => item.key === character.meta.demeanorKey)?.labelRu ?? "—";
+  const selectedSect = dictionaries.sects.find((item) => item.key === character.meta.sectKey);
+  const selectedNature = dictionaries.natures.find((item) => item.key === character.meta.natureKey);
+  const selectedDemeanor = dictionaries.demeanors.find(
+    (item) => item.key === character.meta.demeanorKey
+  );
+  const sectLabel = selectedSect?.labelRu ?? "—";
+  const natureLabel = selectedNature?.labelRu ?? "—";
+  const demeanorLabel = selectedDemeanor?.labelRu ?? "—";
   const chronicleName = chronicle?.name ?? "—";
 
   const avatarUrl = character.meta.avatarUrl?.trim();
 
   return (
-    <section className="page sheet game-mode">
-      <div className="sheet-header">
-        <div className="sheet-header-main">
-          <div className={`sheet-avatar-frame ${avatarUrl ? "" : "empty"}`}>
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="Аватар" />
-            ) : (
+    <HelpPopoverGroup>
+      <section className="page sheet game-mode">
+        <div className="sheet-header">
+          <div className="sheet-header-main">
+            <div className={`sheet-avatar-frame ${avatarUrl ? "" : "empty"}`}>
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Аватар" />
+              ) : (
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => avatarInputRef.current?.click()}
+                >
+                  Загрузить
+                </button>
+              )}
               <button
                 type="button"
-                className="secondary"
+                className="icon-button avatar-edit"
+                title={avatarUrl ? "Изменить" : "Загрузить"}
+                aria-label={avatarUrl ? "Изменить" : "Загрузить"}
                 onClick={() => avatarInputRef.current?.click()}
               >
-                Загрузить
+                ✎
               </button>
-            )}
-            <button
-              type="button"
-              className="icon-button avatar-edit"
-              title={avatarUrl ? "Изменить" : "Загрузить"}
-              aria-label={avatarUrl ? "Изменить" : "Загрузить"}
-              onClick={() => avatarInputRef.current?.click()}
-            >
-              ✎
-            </button>
-            <input
-              ref={avatarInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: "none" }}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                handleAvatarFile(file);
-                event.target.value = "";
-              }}
-            />
-          </div>
-          <div className="sheet-header-text">
-            <div className="sheet-title">{character.meta.name || "(Без имени)"}</div>
-            <div className="sheet-subtitle">
-              {clanLabel} · {sectLabel} · Поколение {character.meta.generation}
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  handleAvatarFile(file);
+                  event.target.value = "";
+                }}
+              />
             </div>
-            <div className="sheet-meta">
-              <span>Игрок: {character.meta.playerName || "—"}</span>
-              <span>
-                Хроника:{" "}
-                {character.meta.chronicleId ? (
-                  <Link className="inline-link" to={`/chronicles/${character.meta.chronicleId}`}>
-                    {chronicleName}
-                  </Link>
-                ) : (
-                  "—"
-                )}
-              </span>
-              <span>Натура: {natureLabel}</span>
-              <span>Поведение: {demeanorLabel}</span>
+            <div className="sheet-header-text">
+              <div className="sheet-title">{character.meta.name || "(Без имени)"}</div>
+              <div className="sheet-subtitle">
+                {clanLabel} · {sectLabel} · Поколение {character.meta.generation}
+              </div>
+              <div className="sheet-meta">
+                <span>Игрок: {character.meta.playerName || "—"}</span>
+                <span>
+                  Хроника:{" "}
+                  {character.meta.chronicleId ? (
+                    <Link className="inline-link" to={`/chronicles/${character.meta.chronicleId}`}>
+                      {chronicleName}
+                    </Link>
+                  ) : (
+                    "—"
+                  )}
+                </span>
+                <span className="sheet-meta-item">
+                  <span>Натура: {natureLabel}</span>
+                  <HelpPopoverButton
+                    popoverId="game-meta-nature"
+                    text={buildDictionaryHelpText(selectedNature)}
+                    ariaLabel="Описание натуры"
+                    showWhenEmpty
+                  />
+                </span>
+                <span className="sheet-meta-item">
+                  <span>Поведение: {demeanorLabel}</span>
+                  <HelpPopoverButton
+                    popoverId="game-meta-demeanor"
+                    text={buildDictionaryHelpText(selectedDemeanor)}
+                    ariaLabel="Описание поведения"
+                    showWhenEmpty
+                  />
+                </span>
+                <span className="sheet-meta-item">
+                  <span>Секта: {sectLabel}</span>
+                  <HelpPopoverButton
+                    popoverId="game-meta-sect"
+                    text={buildDictionaryHelpText(selectedSect)}
+                    ariaLabel="Описание секты"
+                    showWhenEmpty
+                  />
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="sheet-header-right">
+          <div className="sheet-header-right">
           <div className="sheet-stats">
             <div className="stat-pill" data-variant="blood">
               <span className="stat-icon" title="Кровь" aria-label="Кровь" role="img">
@@ -1086,7 +1098,7 @@ export function GameMode({
         </div>
       </div>
 
-      <div className="sheet-grid">
+        <div className="sheet-grid">
         <div className="sheet-col">
           <div className="sheet-card">
             {renderTraitList("Атрибуты", dictionaries.attributes, character.traits.attributes, true, {
@@ -1387,12 +1399,15 @@ export function GameMode({
                   {character.traits.merits.length === 0 && <div className="trait-empty">Нет</div>}
                   {character.traits.merits.map((key) => {
                     const merit = dictionaries.merits.find((item) => item.key === key);
-                    const tooltip = buildTooltip(merit?.description);
                     return (
                       <div key={key} className="trait-row">
                         <span className="trait-label">
                           <span>{merit?.labelRu ?? key}</span>
-                          {renderHelpIcon(tooltip)}
+                          <HelpPopoverButton
+                            popoverId={`game-merit-${key}`}
+                            text={buildDictionaryHelpText(merit)}
+                            ariaLabel={`Описание достоинства ${merit?.labelRu ?? key}`}
+                          />
                         </span>
                         <span className="trait-cost">{merit?.pointCost ?? "—"}</span>
                       </div>
@@ -1406,12 +1421,15 @@ export function GameMode({
                   {character.traits.flaws.length === 0 && <div className="trait-empty">Нет</div>}
                   {character.traits.flaws.map((key) => {
                     const flaw = dictionaries.flaws.find((item) => item.key === key);
-                    const tooltip = buildTooltip(flaw?.description);
                     return (
                       <div key={key} className="trait-row">
                         <span className="trait-label">
                           <span>{flaw?.labelRu ?? key}</span>
-                          {renderHelpIcon(tooltip)}
+                          <HelpPopoverButton
+                            popoverId={`game-flaw-${key}`}
+                            text={buildDictionaryHelpText(flaw)}
+                            ariaLabel={`Описание недостатка ${flaw?.labelRu ?? key}`}
+                          />
                         </span>
                         <span className="trait-cost">{flaw?.pointCost ?? "—"}</span>
                       </div>
@@ -1470,6 +1488,7 @@ export function GameMode({
           </div>
         </div>
       </div>
-    </section>
+      </section>
+    </HelpPopoverGroup>
   );
 }

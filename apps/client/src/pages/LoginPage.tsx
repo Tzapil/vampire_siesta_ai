@@ -52,7 +52,7 @@ export default function LoginPage() {
   }
 
   if (user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={nextPath} replace />;
   }
 
   return (

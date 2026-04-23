@@ -828,11 +828,17 @@ button:disabled {
   color: #cdbfae;
 }
 
-.game-mode .sheet-meta span {
+.game-mode .sheet-meta > span {
   padding: 2px 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--gm-border-soft);
+}
+
+.game-mode .sheet-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .game-mode .sheet-stats {
@@ -1139,12 +1145,14 @@ button:disabled {
   border-color: #3ea6d8;
 }
 
+.game-mode .help-popover-trigger,
 .game-mode .help-icon {
   border-color: rgba(217, 181, 108, 0.6);
   color: var(--gm-accent-strong);
   background: rgba(217, 181, 108, 0.12);
 }
 
+.game-mode .help-popover-trigger:hover,
 .game-mode .help-icon:hover {
   border-color: rgba(240, 200, 120, 0.9);
   color: #fff3d6;
@@ -2176,6 +2184,13 @@ button:disabled {
   gap: 6px;
 }
 
+.field-control-with-help {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+}
+
 .field label {
   font-weight: 600;
 }
@@ -2194,6 +2209,91 @@ button:disabled {
 
 .field small {
   color: #f2a9a9;
+}
+
+.wizard-origin-step {
+  display: grid;
+  gap: 18px;
+}
+
+.wizard-origin-layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.wizard-origin-panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--theme-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.wizard-origin-panel-header {
+  display: grid;
+  gap: 8px;
+}
+
+.wizard-origin-panel-header h4 {
+  margin: 0;
+  font-family: "Cormorant Garamond", "Sora", serif;
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: #fff0d1;
+}
+
+.wizard-origin-panel-header p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--theme-muted);
+}
+
+.wizard-origin-panel-kicker {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: rgba(243, 237, 226, 0.6);
+}
+
+.wizard-origin-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.wizard-origin-field {
+  align-content: start;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--theme-surface-3);
+}
+
+.wizard-origin-field-wide {
+  grid-column: 1 / -1;
+}
+
+.wizard-origin-field label {
+  display: block;
+}
+
+.wizard-origin-field-note {
+  margin: -2px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--theme-muted);
+}
+
+.wizard-origin-readonly {
+  color: rgba(243, 237, 226, 0.7);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.14)),
+    var(--theme-surface-3);
 }
 
 .wizard-priority-grid {
@@ -2334,25 +2434,127 @@ button:disabled {
   height: 11px;
 }
 
+.help-popover {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.help-popover-trigger,
 .help-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 16px;
   height: 16px;
+  padding: 0;
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
   border: 1px solid #2d4a77;
   color: #c9dcf5;
   background: rgba(35, 60, 98, 0.55);
-  cursor: help;
+  cursor: pointer;
   flex: 0 0 auto;
 }
 
+.help-popover-trigger:hover,
 .help-icon:hover {
   border-color: #4e7cd8;
   color: #ffffff;
+}
+
+.help-popover-trigger.is-disabled,
+.help-popover-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 1;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(243, 237, 226, 0.36);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: none;
+  transform: none;
+}
+
+.help-popover-trigger.is-disabled:hover,
+.help-popover-trigger:disabled:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(243, 237, 226, 0.36);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.help-popover-trigger:focus-visible {
+  outline: 2px solid rgba(121, 168, 255, 0.85);
+  outline-offset: 2px;
+}
+
+.help-popover-panel {
+  position: fixed;
+  z-index: 1200;
+  width: min(440px, calc(100vw - 16px));
+  border-radius: 18px;
+  border: 1px solid rgba(217, 181, 108, 0.28);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.24)),
+    rgba(11, 13, 18, 0.96);
+  backdrop-filter: blur(14px);
+  box-shadow:
+    0 24px 60px rgba(3, 7, 14, 0.62),
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+  overflow: hidden;
+  animation: helpPopoverIn 0.16s ease;
+}
+
+.help-popover-card {
+  position: relative;
+  max-height: inherit;
+  overflow-y: auto;
+}
+
+.help-popover-card::before {
+  content: "";
+  position: sticky;
+  top: 0;
+  display: block;
+  height: 3px;
+  background: linear-gradient(90deg, rgba(217, 181, 108, 0.95), rgba(96, 200, 255, 0.65));
+}
+
+.help-popover-header {
+  position: sticky;
+  top: 3px;
+  z-index: 1;
+  padding: 12px 16px 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgba(243, 237, 226, 0.6);
+  background: linear-gradient(180deg, rgba(15, 18, 26, 0.98), rgba(15, 18, 26, 0.86));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(10px);
+}
+
+.help-popover-content {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px 16px;
+  font-size: 13px;
+  line-height: 1.62;
+  color: rgba(243, 237, 226, 0.9);
+}
+
+.help-popover-content p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+@keyframes helpPopoverIn {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .wizard-attr-row.disabled {
@@ -2377,6 +2579,16 @@ button:disabled {
   width: 16px;
   height: 16px;
   accent-color: #2b6bff;
+}
+
+@media (max-width: 720px) {
+  .wizard-origin-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .wizard-origin-field-wide {
+    grid-column: auto;
+  }
 }
 
 .error-list {
@@ -2983,15 +3195,24 @@ h1 {
   color: #fff3d6;
 }
 
+.help-popover-trigger,
 .help-icon {
   border-color: rgba(217, 181, 108, 0.6);
   color: var(--theme-accent-strong);
   background: rgba(217, 181, 108, 0.12);
 }
 
+.help-popover-trigger:hover,
 .help-icon:hover {
   border-color: rgba(240, 200, 120, 0.9);
   color: #fff3d6;
+}
+
+.help-popover-trigger.is-disabled,
+.help-popover-trigger:disabled {
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(243, 237, 226, 0.36);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .icon-button {

@@ -33,6 +33,7 @@ type DisciplineJsonItem = {
   id: string;
   name: string;
   category?: string;
+  description?: string;
 };
 
 type ClanJsonItem = {
@@ -50,6 +51,12 @@ type BackgroundJsonItem = {
 };
 
 type ArchetypeJsonItem = {
+  id: string;
+  name: string;
+  description?: string;
+};
+
+type KeyLabelJsonItem = {
   id: string;
   name: string;
   description?: string;
@@ -142,7 +149,8 @@ async function seed() {
     .map((item) => ({
       key: item.id,
       labelRu: item.name,
-      category: item.category
+      category: item.category,
+      description: item.description ?? ""
     }));
 
   await syncByKey(DisciplineModel, disciplines);
@@ -198,16 +206,21 @@ async function seed() {
 
   await syncByKey(BackgroundModel, backgrounds);
 
-  await syncByKey(VirtueModel, [
-    { key: "conscience", labelRu: "Совесть" },
-    { key: "selfControl", labelRu: "Самообладание" },
-    { key: "courage", labelRu: "Мужество" }
-  ]);
+  const virtuesData = readJson<KeyLabelJsonItem[]>("virtues.json");
+  const virtues = virtuesData.map((item) => ({
+    key: item.id,
+    labelRu: item.name,
+    description: item.description ?? ""
+  }));
+  await syncByKey(VirtueModel, virtues);
 
-  await syncByKey(SectModel, [
-    { key: "camarilla", labelRu: "Камарилья" },
-    { key: "sabbat", labelRu: "Шабаш" }
-  ]);
+  const sectsData = readJson<KeyLabelJsonItem[]>("sects.json");
+  const sects = sectsData.map((item) => ({
+    key: item.id,
+    labelRu: item.name,
+    description: item.description ?? ""
+  }));
+  await syncByKey(SectModel, sects);
 
   const archetypesData = readJson<ArchetypeJsonItem[]>("archetypes.json");
   const archetypes = archetypesData.map((item) => ({

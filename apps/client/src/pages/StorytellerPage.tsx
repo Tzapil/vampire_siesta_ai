@@ -2,9 +2,11 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { CharacterDto, ChronicleDto, DictItem } from "../api/types";
+import { HelpPopoverButton, HelpPopoverGroup } from "../components/HelpPopover";
 import { useDictionaries } from "../context/DictionariesContext";
 import { useToast } from "../context/ToastContext";
 import { useCharacterSocket } from "../hooks/useCharacterSocket";
+import { buildDictionaryHelpText } from "../utils/dictionaryHelp";
 import { setByPath } from "../utils/setByPath";
 import NotFound from "./NotFound";
 
@@ -16,6 +18,7 @@ type TraitEntry = {
   max: number;
   disabled?: boolean;
   path: string;
+  helpText: string | null;
 };
 
 function DotsDisplay({
@@ -188,7 +191,8 @@ export default function StorytellerPage() {
           min,
           max,
           disabled: disablePredicate?.(item),
-          path: `traits.${category}.${item.key}.storyteller`
+          path: `traits.${category}.${item.key}.storyteller`,
+          helpText: buildDictionaryHelpText(item)
       }));
 
     const appearanceFixed = clan?.rules?.appearanceFixedTo === 0;
@@ -236,240 +240,277 @@ export default function StorytellerPage() {
   }
 
   return (
-    <section className="page">
-      <div className="card">
-        <div className="card-header st-header">
-          <div className="card-header-main">
-            <div className="section-title">Режим ведущего</div>
-            <div className="st-meta">
-              <span>Персонаж: {character.meta.name?.trim() || "(Без имени)"}</span>
-              <span>Игрок: {character.meta.playerName?.trim() || "—"}</span>
-              <span>Хроника: {chronicle?.name || "—"}</span>
+    <HelpPopoverGroup>
+      <section className="page">
+        <div className="card">
+          <div className="card-header st-header">
+            <div className="card-header-main">
+              <div className="section-title">Режим ведущего</div>
+              <div className="st-meta">
+                <span>Персонаж: {character.meta.name?.trim() || "(Без имени)"}</span>
+                <span>Игрок: {character.meta.playerName?.trim() || "—"}</span>
+                <span>Хроника: {chronicle?.name || "—"}</span>
+              </div>
             </div>
-          </div>
-          <div className="page-actions header-actions">
-            <button
-              type="button"
-              className="icon-button danger"
-              title="Удалить персонажа"
-              aria-label="Удалить персонажа"
-              onClick={handleDelete}
-            >
-              🗑
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="grid-2">
-          <div className="field">
-            <label>Клан</label>
-            <select value={currentClan} onChange={(event) => handlePatch("meta.clanKey", event.target.value)}>
-              <option value="">Выберите клан</option>
-              {clanOptions.map((item) => (
-                <option key={item.key} value={item.key}>
-                  {item.labelRu}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>Хроника</label>
-            <select
-              value={character.meta.chronicleId}
-              onChange={(event) => handlePatch("meta.chronicleId", event.target.value)}
-            >
-              <option value="">Выберите хронику</option>
-              {chronicles.map((item) => (
-                <option key={item._id} value={item._id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="section-title">Характеристики</div>
-        <div className="st-grid">
-          <div className="wizard-attr-card">
-            <div className="wizard-attr-card-header">
-              <span>Атрибуты</span>
-            </div>
-            <div className="wizard-attr-list">
-              {buildEntries.attributes.map((entry) => {
-                const total = entry.layer.base + entry.layer.freebie + entry.layer.storyteller;
-                return (
-                  <div key={entry.path} className="wizard-attr-item">
-                    <div className={`wizard-attr-row st-row ${entry.disabled ? "disabled" : ""}`}>
-                      <span>{entry.label}</span>
-                      <DotsDisplay total={total} max={entry.max} />
-                      <div className="st-actions">
-                        <button
-                          type="button"
-                          disabled={entry.disabled}
-                          onClick={() => handleAdjust(entry, -1)}
-                        >
-                          -
-                        </button>
-                        <button
-                          type="button"
-                          disabled={entry.disabled}
-                          onClick={() => handleAdjust(entry, 1)}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="wizard-attr-card">
-            <div className="wizard-attr-card-header">
-              <span>Способности</span>
-            </div>
-            <div className="wizard-attr-list">
-              {buildEntries.abilities.map((entry) => {
-                const total = entry.layer.base + entry.layer.freebie + entry.layer.storyteller;
-                return (
-                  <div key={entry.path} className="wizard-attr-item">
-                    <div className={`wizard-attr-row st-row ${entry.disabled ? "disabled" : ""}`}>
-                      <span>{entry.label}</span>
-                      <DotsDisplay total={total} max={entry.max} />
-                      <div className="st-actions">
-                        <button
-                          type="button"
-                          disabled={entry.disabled}
-                          onClick={() => handleAdjust(entry, -1)}
-                        >
-                          -
-                        </button>
-                        <button
-                          type="button"
-                          disabled={entry.disabled}
-                          onClick={() => handleAdjust(entry, 1)}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="wizard-attr-card">
-            <div className="wizard-attr-card-header">
-              <span>Дисциплины</span>
-            </div>
-            <div className="wizard-attr-list">
-              {buildEntries.disciplines.map((entry) => {
-                const total = entry.layer.base + entry.layer.freebie + entry.layer.storyteller;
-                return (
-                  <div key={entry.path} className="wizard-attr-item">
-                    <div className={`wizard-attr-row st-row ${entry.disabled ? "disabled" : ""}`}>
-                      <span>{entry.label}</span>
-                      <DotsDisplay total={total} max={entry.max} />
-                      <div className="st-actions">
-                        <button
-                          type="button"
-                          disabled={entry.disabled}
-                          onClick={() => handleAdjust(entry, -1)}
-                        >
-                          -
-                        </button>
-                        <button
-                          type="button"
-                          disabled={entry.disabled}
-                          onClick={() => handleAdjust(entry, 1)}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="wizard-attr-card">
-            <div className="wizard-attr-card-header">
-              <span>Детали биографии</span>
-            </div>
-            <div className="wizard-attr-list">
-              {buildEntries.backgrounds.map((entry) => {
-                const total = entry.layer.base + entry.layer.freebie + entry.layer.storyteller;
-                return (
-                  <div key={entry.path} className="wizard-attr-item">
-                    <div className={`wizard-attr-row st-row ${entry.disabled ? "disabled" : ""}`}>
-                      <span>{entry.label}</span>
-                      <DotsDisplay total={total} max={entry.max} />
-                      <div className="st-actions">
-                        <button
-                          type="button"
-                          disabled={entry.disabled}
-                          onClick={() => handleAdjust(entry, -1)}
-                        >
-                          -
-                        </button>
-                        <button
-                          type="button"
-                          disabled={entry.disabled}
-                          onClick={() => handleAdjust(entry, 1)}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="wizard-attr-card">
-            <div className="wizard-attr-card-header">
-              <span>Добродетели</span>
-            </div>
-            <div className="wizard-attr-list">
-              {buildEntries.virtues.map((entry) => {
-                const total = entry.layer.base + entry.layer.freebie + entry.layer.storyteller;
-                return (
-                  <div key={entry.path} className="wizard-attr-item">
-                    <div className={`wizard-attr-row st-row ${entry.disabled ? "disabled" : ""}`}>
-                      <span>{entry.label}</span>
-                      <DotsDisplay total={total} max={entry.max} />
-                      <div className="st-actions">
-                        <button
-                          type="button"
-                          disabled={entry.disabled}
-                          onClick={() => handleAdjust(entry, -1)}
-                        >
-                          -
-                        </button>
-                        <button
-                          type="button"
-                          disabled={entry.disabled}
-                          onClick={() => handleAdjust(entry, 1)}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="page-actions header-actions">
+              <button
+                type="button"
+                className="icon-button danger"
+                title="Удалить персонажа"
+                aria-label="Удалить персонажа"
+                onClick={handleDelete}
+              >
+                🗑
+              </button>
             </div>
           </div>
         </div>
-      </div>
-    </section>
+
+        <div className="card">
+          <div className="grid-2">
+            <div className="field">
+              <label>Клан</label>
+              <select value={currentClan} onChange={(event) => handlePatch("meta.clanKey", event.target.value)}>
+                <option value="">Выберите клан</option>
+                {clanOptions.map((item) => (
+                  <option key={item.key} value={item.key}>
+                    {item.labelRu}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label>Хроника</label>
+              <select
+                value={character.meta.chronicleId}
+                onChange={(event) => handlePatch("meta.chronicleId", event.target.value)}
+              >
+                <option value="">Выберите хронику</option>
+                {chronicles.map((item) => (
+                  <option key={item._id} value={item._id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="section-title">Характеристики</div>
+          <div className="st-grid">
+            <div className="wizard-attr-card">
+              <div className="wizard-attr-card-header">
+                <span>Атрибуты</span>
+              </div>
+              <div className="wizard-attr-list">
+                {buildEntries.attributes.map((entry) => {
+                  const total = entry.layer.base + entry.layer.freebie + entry.layer.storyteller;
+                  return (
+                    <div key={entry.path} className="wizard-attr-item">
+                      <div className={`wizard-attr-row st-row ${entry.disabled ? "disabled" : ""}`}>
+                        <span className="wizard-attr-label">
+                          <span>{entry.label}</span>
+                          <HelpPopoverButton
+                            popoverId={`st-${entry.path}`}
+                            text={entry.helpText}
+                            ariaLabel={`Описание: ${entry.label}`}
+                          />
+                        </span>
+                        <DotsDisplay total={total} max={entry.max} />
+                        <div className="st-actions">
+                          <button
+                            type="button"
+                            disabled={entry.disabled}
+                            onClick={() => handleAdjust(entry, -1)}
+                          >
+                            -
+                          </button>
+                          <button
+                            type="button"
+                            disabled={entry.disabled}
+                            onClick={() => handleAdjust(entry, 1)}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="wizard-attr-card">
+              <div className="wizard-attr-card-header">
+                <span>Способности</span>
+              </div>
+              <div className="wizard-attr-list">
+                {buildEntries.abilities.map((entry) => {
+                  const total = entry.layer.base + entry.layer.freebie + entry.layer.storyteller;
+                  return (
+                    <div key={entry.path} className="wizard-attr-item">
+                      <div className={`wizard-attr-row st-row ${entry.disabled ? "disabled" : ""}`}>
+                        <span className="wizard-attr-label">
+                          <span>{entry.label}</span>
+                          <HelpPopoverButton
+                            popoverId={`st-${entry.path}`}
+                            text={entry.helpText}
+                            ariaLabel={`Описание: ${entry.label}`}
+                          />
+                        </span>
+                        <DotsDisplay total={total} max={entry.max} />
+                        <div className="st-actions">
+                          <button
+                            type="button"
+                            disabled={entry.disabled}
+                            onClick={() => handleAdjust(entry, -1)}
+                          >
+                            -
+                          </button>
+                          <button
+                            type="button"
+                            disabled={entry.disabled}
+                            onClick={() => handleAdjust(entry, 1)}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="wizard-attr-card">
+              <div className="wizard-attr-card-header">
+                <span>Дисциплины</span>
+              </div>
+              <div className="wizard-attr-list">
+                {buildEntries.disciplines.map((entry) => {
+                  const total = entry.layer.base + entry.layer.freebie + entry.layer.storyteller;
+                  return (
+                    <div key={entry.path} className="wizard-attr-item">
+                      <div className={`wizard-attr-row st-row ${entry.disabled ? "disabled" : ""}`}>
+                        <span className="wizard-attr-label">
+                          <span>{entry.label}</span>
+                          <HelpPopoverButton
+                            popoverId={`st-${entry.path}`}
+                            text={entry.helpText}
+                            ariaLabel={`Описание: ${entry.label}`}
+                          />
+                        </span>
+                        <DotsDisplay total={total} max={entry.max} />
+                        <div className="st-actions">
+                          <button
+                            type="button"
+                            disabled={entry.disabled}
+                            onClick={() => handleAdjust(entry, -1)}
+                          >
+                            -
+                          </button>
+                          <button
+                            type="button"
+                            disabled={entry.disabled}
+                            onClick={() => handleAdjust(entry, 1)}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="wizard-attr-card">
+              <div className="wizard-attr-card-header">
+                <span>Детали биографии</span>
+              </div>
+              <div className="wizard-attr-list">
+                {buildEntries.backgrounds.map((entry) => {
+                  const total = entry.layer.base + entry.layer.freebie + entry.layer.storyteller;
+                  return (
+                    <div key={entry.path} className="wizard-attr-item">
+                      <div className={`wizard-attr-row st-row ${entry.disabled ? "disabled" : ""}`}>
+                        <span className="wizard-attr-label">
+                          <span>{entry.label}</span>
+                          <HelpPopoverButton
+                            popoverId={`st-${entry.path}`}
+                            text={entry.helpText}
+                            ariaLabel={`Описание: ${entry.label}`}
+                          />
+                        </span>
+                        <DotsDisplay total={total} max={entry.max} />
+                        <div className="st-actions">
+                          <button
+                            type="button"
+                            disabled={entry.disabled}
+                            onClick={() => handleAdjust(entry, -1)}
+                          >
+                            -
+                          </button>
+                          <button
+                            type="button"
+                            disabled={entry.disabled}
+                            onClick={() => handleAdjust(entry, 1)}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="wizard-attr-card">
+              <div className="wizard-attr-card-header">
+                <span>Добродетели</span>
+              </div>
+              <div className="wizard-attr-list">
+                {buildEntries.virtues.map((entry) => {
+                  const total = entry.layer.base + entry.layer.freebie + entry.layer.storyteller;
+                  return (
+                    <div key={entry.path} className="wizard-attr-item">
+                      <div className={`wizard-attr-row st-row ${entry.disabled ? "disabled" : ""}`}>
+                        <span className="wizard-attr-label">
+                          <span>{entry.label}</span>
+                          <HelpPopoverButton
+                            popoverId={`st-${entry.path}`}
+                            text={entry.helpText}
+                            ariaLabel={`Описание: ${entry.label}`}
+                          />
+                        </span>
+                        <DotsDisplay total={total} max={entry.max} />
+                        <div className="st-actions">
+                          <button
+                            type="button"
+                            disabled={entry.disabled}
+                            onClick={() => handleAdjust(entry, -1)}
+                          >
+                            -
+                          </button>
+                          <button
+                            type="button"
+                            disabled={entry.disabled}
+                            onClick={() => handleAdjust(entry, 1)}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </HelpPopoverGroup>
   );
 }

@@ -70,7 +70,7 @@ router.get(
 router.get(
   "/virtues",
   asyncHandler(async (_req, res) => {
-    const items = await VirtueModel.find().select("key labelRu -_id").lean();
+    const items = await VirtueModel.find().select("key labelRu description -_id").lean();
     res.json(items);
   })
 );
@@ -98,7 +98,7 @@ router.get(
 router.get(
   "/sects",
   asyncHandler(async (_req, res) => {
-    const items = await SectModel.find().select("key labelRu -_id").lean();
+    const items = await SectModel.find().select("key labelRu description -_id").lean();
     res.json(items);
   })
 );
@@ -106,7 +106,7 @@ router.get(
 router.get(
   "/natures",
   asyncHandler(async (_req, res) => {
-    const items = await NatureModel.find().select("key labelRu -_id").lean();
+    const items = await NatureModel.find().select("key labelRu description -_id").lean();
     res.json(items);
   })
 );
@@ -114,7 +114,7 @@ router.get(
 router.get(
   "/demeanors",
   asyncHandler(async (_req, res) => {
-    const items = await DemeanorModel.find().select("key labelRu -_id").lean();
+    const items = await DemeanorModel.find().select("key labelRu description -_id").lean();
     res.json(items);
   })
 );
@@ -130,4 +130,3 @@ router.get(
 );
 
 export default router;
-
