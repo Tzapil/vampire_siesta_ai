@@ -6,16 +6,23 @@ COPY package.json package-lock.json* ./
 COPY tsconfig.base.json ./
 COPY apps/client/package.json apps/client/
 COPY apps/server/package.json apps/server/
+COPY packages/shared/package.json packages/shared/
+COPY packages/shared/tsconfig.json packages/shared/
+COPY packages/shared/src packages/shared/src
 
 RUN npm install
 
-FROM deps AS client-build
+FROM deps AS shared-build
+
+RUN npm -w packages/shared run build
+
+FROM shared-build AS client-build
 
 COPY apps/client apps/client
 ENV NODE_OPTIONS=--max-old-space-size=384
 RUN npm -w apps/client run build
 
-FROM deps AS server-build
+FROM shared-build AS server-build
 
 COPY apps/server apps/server
 ENV NODE_OPTIONS=--max-old-space-size=384
@@ -28,6 +35,7 @@ ENV NODE_ENV=production
 
 COPY package.json package-lock.json* ./
 COPY apps/server/package.json apps/server/
+COPY --from=shared-build /app/packages/shared /app/packages/shared
 
 RUN npm install --omit=dev --workspace apps/server --include-workspace-root
 
