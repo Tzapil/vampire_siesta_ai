@@ -3,12 +3,13 @@
   "private": true,
   "version": "0.1.0",
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "build": "npm -w apps/client run build && npm -w apps/server run build",
-    "typecheck": "npm -w apps/client run typecheck && npm -w apps/server run typecheck",
+    "build": "npm -w packages/shared run build && npm -w apps/client run build && npm -w apps/server run build",
+    "typecheck": "npm -w packages/shared run typecheck && npm -w apps/client run typecheck && npm -w apps/server run typecheck",
     "seed": "npm -w apps/server run seed"
   }
 }

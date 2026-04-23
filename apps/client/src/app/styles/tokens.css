@@ -1,0 +1,18 @@
+:root {
+  --app-font-sans: "Sora", "Space Grotesk", "Segoe UI", sans-serif;
+  --app-font-serif: "Cormorant Garamond", "Sora", serif;
+  --theme-bg: #0b0c10;
+  --theme-surface: #141720;
+  --theme-surface-2: #1b202b;
+  --theme-surface-3: #10131a;
+  --theme-border: #2a3140;
+  --theme-border-soft: #222836;
+  --theme-text: #f3ede2;
+  --theme-muted: #b4a99e;
+  --theme-accent: #d9b56c;
+  --theme-accent-strong: #f0c878;
+  --theme-accent-soft: rgba(217, 181, 108, 0.18);
+  --theme-success: #7fdcb3;
+  --theme-danger: #ff8080;
+  --theme-info: #60c8ff;
+}

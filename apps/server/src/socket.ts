@@ -1,8 +1,8 @@
-﻿import { Server, Socket } from "socket.io";
+import { Server, Socket } from "socket.io";
+import { setByPathMutable } from "@siesta/shared";
 import { getAuthErrorMessage } from "./auth/errors";
 import type { AuthService } from "./auth/service";
 import { CharacterModel, ChronicleModel } from "./db";
-import { setByPath } from "./utils/setByPath";
 import {
   applyClanRules,
   applyGenerationDerived,
@@ -181,7 +181,7 @@ export function registerSocket(io: Server, authService: AuthService) {
           }
         }
 
-        setByPath(character, patch.path, patch.value);
+        setByPathMutable(character, patch.path, patch.value);
 
         const stepForPath = getStepForPath(patch.path, character.wizard?.currentStep ?? 1);
         if (!character.creationFinished && stepForPath && character.wizard) {

@@ -1,9 +1,46 @@
-﻿export type DictItem = {
-  key: string;
-  labelRu: string;
-  description?: string;
-  category?: string;
-  maxValue?: number;
+import type {
+  AbilityDto as SharedAbilityDto,
+  AggregatedDictionariesDto as SharedAggregatedDictionariesDto,
+  AttributeDto as SharedAttributeDto,
+  CharacterSummaryDto as SharedCharacterSummaryDto,
+  ChronicleDto as SharedChronicleDto,
+  ClanDto as SharedClanDto,
+  DictItem as SharedDictItem,
+  FlawDto as SharedFlawDto,
+  GenerationDto as SharedGenerationDto,
+  HomeScreenDto as SharedHomeScreenDto,
+  LayeredValue as SharedLayeredValue,
+  MeritDto as SharedMeritDto
+} from "@siesta/shared";
+
+export type DictItem = SharedDictItem;
+export type ClanDto = SharedClanDto;
+export type AttributeDto = SharedAttributeDto;
+export type AbilityDto = SharedAbilityDto;
+export type GenerationDto = SharedGenerationDto;
+export type MeritDto = SharedMeritDto;
+export type FlawDto = SharedFlawDto;
+export type ChronicleDto = SharedChronicleDto;
+export type CharacterSummaryDto = SharedCharacterSummaryDto;
+export type LayeredValue = SharedLayeredValue;
+export type AggregatedDictionariesDto = SharedAggregatedDictionariesDto;
+export type HomeScreenDto = SharedHomeScreenDto;
+
+export type ChronicleLogDto = {
+  _id: string;
+  chronicleId: string;
+  type: string;
+  message: string;
+  data?: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type ChronicleImageDto = {
+  _id: string;
+  chronicleId: string;
+  dataUrl: string;
+  name?: string;
+  createdAt: string;
 };
 
 export type AuthProviderId = "google" | "yandex";
@@ -27,91 +64,6 @@ export type AuthUserDto = {
   lastSeenAt: string;
   lastLoginAt: string;
   avatarUrl: string | null;
-};
-
-export type ClanDto = DictItem & {
-  disciplineKeys: string[];
-  rules?: { appearanceFixedTo?: number };
-};
-
-export type AttributeDto = DictItem & {
-  group: "physical" | "social" | "mental";
-  specializationAt?: number;
-  specializationDescription?: string;
-  pageRef?: string;
-};
-
-export type AbilityDto = DictItem & {
-  group: "talents" | "skills" | "knowledges";
-  specializationAt?: number;
-  specializationDescription?: string;
-  pageRef?: string;
-};
-
-export type GenerationDto = {
-  generation: number;
-  bloodPoolMax: number;
-  bloodPerTurn: number;
-};
-
-export type MeritDto = DictItem & {
-  pointCost: number;
-  description?: string;
-};
-
-export type FlawDto = DictItem & {
-  pointCost: number;
-  description?: string;
-};
-
-export type ChronicleDto = {
-  _id: string;
-  name: string;
-  description?: string;
-  createdByUserId?: string;
-  createdByDisplayName?: string;
-  deleted?: boolean;
-};
-
-export type ChronicleLogDto = {
-  _id: string;
-  chronicleId: string;
-  type: string;
-  message: string;
-  data?: Record<string, unknown>;
-  createdAt: string;
-};
-
-export type ChronicleImageDto = {
-  _id: string;
-  chronicleId: string;
-  dataUrl: string;
-  name?: string;
-  createdAt: string;
-};
-
-export type CharacterSummaryDto = {
-  uuid: string;
-  creationFinished: boolean;
-  createdAt?: string;
-  createdByUserId?: string;
-  createdByDisplayName?: string;
-  chronicleName?: string;
-  meta: {
-    name: string;
-    chronicleId: string;
-    avatarUrl?: string;
-    playerName?: string;
-    clanKey?: string;
-    sectKey?: string;
-    generation?: number;
-  };
-  traits?: {
-    attributes?: Record<string, LayeredValue>;
-  };
-  resources?: {
-    health?: { bashing: number; lethal: number; aggravated: number };
-  };
 };
 
 export type CombatInitiativeDto = {
@@ -138,12 +90,6 @@ export type CombatStateDto = {
   initiatives: Record<string, CombatInitiativeDto>;
   enemies: CombatEnemyDto[];
   active: boolean;
-};
-
-export type LayeredValue = {
-  base: number;
-  freebie: number;
-  storyteller: number;
 };
 
 export type PriorityRank = "primary" | "secondary" | "tertiary";

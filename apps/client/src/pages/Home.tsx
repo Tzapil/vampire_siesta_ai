@@ -1,58 +1,47 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api/client";
-import type { CharacterSummaryDto, ChronicleDto } from "../api/types";
+import type { HomeScreenDto } from "../api/types";
 import { useDictionaries } from "../context/DictionariesContext";
 import { useToast } from "../context/ToastContext";
+import { fetchHomeScreen } from "../features/home/api";
 
 export default function Home() {
-  const [chronicles, setChronicles] = useState<ChronicleDto[]>([]);
-  const [characters, setCharacters] = useState<CharacterSummaryDto[]>([]);
-  const [chroniclesLoading, setChroniclesLoading] = useState(true);
-  const [charactersLoading, setCharactersLoading] = useState(true);
-  const [charactersError, setCharactersError] = useState("");
+  const [screen, setScreen] = useState<HomeScreenDto | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const { pushToast } = useToast();
   const { dictionaries } = useDictionaries();
 
   useEffect(() => {
     let active = true;
+
     async function load() {
-      const [chroniclesResult, charactersResult] = await Promise.allSettled([
-        api.get<ChronicleDto[]>("/chronicles"),
-        api.get<CharacterSummaryDto[]>("/characters?owner=me&creationFinished=true")
-      ]);
-
-      if (!active) return;
-
-      if (chroniclesResult.status === "fulfilled") {
-        setChronicles(chroniclesResult.value);
-      } else {
-        const message =
-          chroniclesResult.reason instanceof Error
-            ? chroniclesResult.reason.message
-            : "Не удалось загрузить хроники";
+      setLoading(true);
+      setError("");
+      try {
+        const data = await fetchHomeScreen();
+        if (!active) return;
+        setScreen(data);
+      } catch (err: any) {
+        if (!active) return;
+        const message = err?.message ?? "Не удалось загрузить главную страницу";
+        setError(message);
         pushToast(message, "error");
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
       }
-
-      if (charactersResult.status === "fulfilled") {
-        setCharacters(charactersResult.value);
-        setCharactersError("");
-      } else {
-        const message =
-          charactersResult.reason instanceof Error
-            ? charactersResult.reason.message
-            : "Не удалось загрузить персонажей";
-        setCharactersError(message);
-      }
-
-      setChroniclesLoading(false);
-      setCharactersLoading(false);
     }
-    load();
+
+    void load();
     return () => {
       active = false;
     };
   }, [pushToast]);
+
+  const chronicles = screen?.chronicles ?? [];
+  const characters = screen?.characters ?? [];
 
   return (
     <section className="page home-page">
@@ -70,7 +59,7 @@ export default function Home() {
             title="Создать хронику"
             aria-label="Создать хронику"
           >
-            ✚
+            ✓
           </Link>
         </div>
       </div>
@@ -80,10 +69,10 @@ export default function Home() {
           <div className="section-title">Мои персонажи</div>
           <span className="tag">{characters.length}</span>
         </div>
-        {charactersLoading ? (
+        {loading ? (
           <p>Загрузка…</p>
-        ) : charactersError ? (
-          <div className="home-empty">{charactersError}</div>
+        ) : error ? (
+          <div className="home-empty">{error}</div>
         ) : (
           <div className="chronicle-character-grid home-character-grid">
             {characters.map((character) => {
@@ -136,8 +125,10 @@ export default function Home() {
           <div className="section-title">Список хроник</div>
           <span className="tag">{chronicles.length}</span>
         </div>
-        {chroniclesLoading ? (
+        {loading ? (
           <p>Загрузка…</p>
+        ) : error ? (
+          <div className="home-empty">{error}</div>
         ) : (
           <div className="list home-list">
             {chronicles.map((chronicle) => (
@@ -148,7 +139,7 @@ export default function Home() {
             ))}
             {chronicles.length === 0 && (
               <div className="home-empty">
-                Пока нет хроник. Нажмите ✚, чтобы создать первую.
+                Пока нет хроник. Нажмите ✓, чтобы создать первую.
               </div>
             )}
           </div>
