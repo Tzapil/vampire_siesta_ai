@@ -93,8 +93,10 @@ export type ChronicleImageDto = {
 export type CharacterSummaryDto = {
   uuid: string;
   creationFinished: boolean;
+  createdAt?: string;
   createdByUserId?: string;
   createdByDisplayName?: string;
+  chronicleName?: string;
   meta: {
     name: string;
     chronicleId: string;

@@ -71,6 +71,7 @@
 - Почти все бэкенд-маршруты под `/api` тоже защищены после подключения auth middleware.
 - Справочники загружаются после авторизации через `DictionariesProvider`; многие экраны предполагают, что они уже доступны.
 - Изменения персонажа проходят в реальном времени через Socket.IO, cookie-auth и optimistic versioning.
+- Главная страница помимо хроник загружает завершённых персонажей текущего пользователя через `GET /api/characters?owner=me&creationFinished=true`; в этот список не попадают черновики, удалённые персонажи и персонажи других пользователей.
 
 ## Заметки По Клиенту
 
@@ -85,6 +86,7 @@
 - `HelpPopoverGroup` гарантирует, что одновременно открыт только один popover в пределах экрана/секции.
 - Для полей, где описание зависит от выбранного значения (`секта`, `натура`, `поведение`), `HelpPopoverButton` поддерживает `showWhenEmpty`: кнопка остаётся на месте disabled и не даёт вёрстке прыгать.
 - Если нужно изменить состав текста в popover, сначала смотреть `apps/client/src/utils/dictionaryHelp.ts`, а не править `Wizard`/`GameMode` по месту.
+- Импорт JSON в UI доступен на странице хроники (`ChroniclePage`) и создаёт нового персонажа в этой хронике; на главной и странице персонажа пользовательский импорт не показывается.
 
 ## Заметки По Серверу
 
@@ -94,6 +96,8 @@
 - `createApiRouter()` публикует `/api/health`, auth routes, validation maintenance endpoints и доменные роутеры.
 - Socket-авторизация использует те же session cookies, что и HTTP.
 - Socket patch flow проверяет версию персонажа, нормализует патч, валидирует его по справочникам и правилам, мутирует документ и затем рассылает patch/resync события.
+- Экспорт персонажа идёт через `GET /api/characters/:uuid/export` и санитизируется в `apps/server/src/utils/characterTransfer.ts`: не должен сохранять UUID, owner/player-поля и `meta.chronicleId`.
+- Импорт персонажа в хронику идёт через `POST /api/chronicles/:id/characters/import`: сервер игнорирует переносимые identity/system/owner/player/`meta.chronicleId` поля, подставляет хронику из URL и текущего пользователя как владельца/игрока. Старый `POST /api/characters/:uuid/import` закрыт для перезаписи существующих персонажей.
 
 ## Подсистема Валидации
 
@@ -137,6 +141,7 @@
 - `npm run typecheck`
 - `npm run seed`
 - `npm -w apps/server run test`
+- Если в локальном shell `node`/`npm` не находятся, в этом окружении помогает сначала выполнить `source ~/.nvm/nvm.sh && nvm use 25.9.0`.
 
 ## Docker И Деплой
 

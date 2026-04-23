@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { CharacterDto } from "../api/types";
@@ -16,7 +16,6 @@ export default function CharacterPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const { pushToast } = useToast();
-  const importInputRef = useRef<HTMLInputElement | null>(null);
   const { setActions } = useAppHeader();
 
   const fetchCharacter = useCallback(async () => {
@@ -123,23 +122,6 @@ export default function CharacterPage() {
     }
   }, [pushToast, uuid]);
 
-  const handleImportFile = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !uuid) return;
-    try {
-      const text = await file.text();
-      const json = JSON.parse(text);
-      await api.post(`/characters/${uuid}/import`, json);
-      pushToast("Импорт выполнен", "success");
-      await fetchCharacter();
-    } catch (err: any) {
-      const message = err?.errors?.[0]?.message || err?.message || "Ошибка импорта";
-      pushToast(message, "error");
-    } finally {
-      event.target.value = "";
-    }
-  }, [fetchCharacter, pushToast, uuid]);
-
   const characterUuid = character?.uuid;
   const headerActions = useMemo(() => {
     if (!characterUuid || !character?.creationFinished) {
@@ -165,15 +147,6 @@ export default function CharacterPage() {
         >
           ⤓
         </button>
-        <button
-          type="button"
-          className="icon-button"
-          title="Импорт JSON"
-          aria-label="Импорт JSON"
-          onClick={() => importInputRef.current?.click()}
-        >
-          ⤒
-        </button>
         <Link
           to={`/c/${characterUuid}/st`}
           className="icon-button"
@@ -182,16 +155,9 @@ export default function CharacterPage() {
         >
           🎲
         </Link>
-        <input
-          ref={importInputRef}
-          type="file"
-          accept="application/json"
-          style={{ display: "none" }}
-          onChange={handleImportFile}
-        />
       </>
     );
-  }, [character?.creationFinished, characterUuid, handleCopy, handleExport, handleImportFile]);
+  }, [character?.creationFinished, characterUuid, handleCopy, handleExport]);
 
   useEffect(() => {
     setActions(headerActions);

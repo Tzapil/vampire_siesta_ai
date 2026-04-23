@@ -9,7 +9,7 @@ import {
   VirtueModel
 } from "../db";
 import { asyncHandler } from "../utils/asyncHandler";
-import { presentCharacter } from "../utils/characterPresenter";
+import { presentCharacter, presentCharacterList } from "../utils/characterPresenter";
 import { generateUuid } from "../utils/uuid";
 import { deriveFromGeneration } from "../utils/derived";
 import {
@@ -61,6 +61,62 @@ function ensurePlayerName(character: any, authUser: { id: string; displayName: s
     playerName
   };
 }
+
+router.get(
+  "/characters",
+  asyncHandler(async (req, res) => {
+    const authUser = req.auth?.user;
+    if (!authUser) {
+      res.status(401).json({ message: "Требуется авторизация" });
+      return;
+    }
+
+    if (req.query.owner !== "me" || req.query.creationFinished !== "true") {
+      res.status(400).json({
+        message: "Поддерживается только список /characters?owner=me&creationFinished=true"
+      });
+      return;
+    }
+
+    const characters = await CharacterModel.find({
+      createdByUserId: authUser.id,
+      creationFinished: true,
+      deleted: { $ne: true }
+    })
+      .select(
+        "-_id uuid createdAt createdByUserId createdByDisplayName meta.name meta.avatarUrl meta.playerName meta.clanKey meta.sectKey meta.generation creationFinished meta.chronicleId"
+      )
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const chronicleIds = Array.from(
+      new Set(
+        characters
+          .map((character) => character.meta?.chronicleId)
+          .filter(Boolean)
+          .map((chronicleId) => String(chronicleId))
+      )
+    );
+    const chronicles = chronicleIds.length
+      ? await ChronicleModel.find({ _id: { $in: chronicleIds }, deleted: { $ne: true } })
+          .select("_id name")
+          .lean()
+      : [];
+    const chronicleNameById = new Map(
+      chronicles.map((chronicle) => [String(chronicle._id), chronicle.name])
+    );
+
+    const presented = await presentCharacterList(characters);
+    res.json(
+      presented.map((character) => ({
+        ...character,
+        chronicleName: character.meta?.chronicleId
+          ? chronicleNameById.get(String(character.meta.chronicleId))
+          : undefined
+      }))
+    );
+  })
+);
 
 router.post(
   "/characters",
@@ -218,70 +274,10 @@ router.get(
 
 router.post(
   "/characters/:uuid/import",
-  asyncHandler(async (req, res) => {
-    const authUser = req.auth?.user;
-    if (!authUser) {
-      res.status(401).json({ message: "Требуется авторизация" });
-      return;
-    }
-
-    const character = await CharacterModel.findOne({ uuid: req.params.uuid, deleted: false });
-    if (!character) {
-      res.status(404).json({ message: "Персонаж не найден" });
-      return;
-    }
-
-    if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
-      res.status(400).json({ errors: [{ path: "body", message: "Неверный формат JSON" }] });
-      return;
-    }
-
-    const payload = { ...(req.body as any) };
-    delete payload.uuid;
-    delete payload._id;
-    delete payload.__v;
-    delete payload.createdByUserId;
-    delete payload.createdByDisplayName;
-
-    payload.meta = {
-      ...(payload.meta ?? {}),
-      playerName: authUser.displayName
-    };
-
-    character.overwrite({
-      ...payload,
-      uuid: character.uuid,
-      createdByUserId: authUser.id,
-      createdByDisplayName: authUser.displayName,
-      deleted: false,
-      deletedAt: undefined,
-      version: character.version
+  asyncHandler(async (_req, res) => {
+    res.status(410).json({
+      message: "Импорт в существующего персонажа отключён. Импортируйте JSON на странице хроники."
     });
-
-    const dict = await loadDictionaries();
-    const errors = await validateAllWizardSteps(character, dict, { mutate: false });
-
-    if (!character.traits?.attributes || !character.traits?.abilities || !character.traits?.disciplines) {
-      errors.push({ path: "traits", message: "Некорректная структура traits" });
-    }
-    if (!character.traits?.backgrounds || !character.traits?.virtues) {
-      errors.push({ path: "traits", message: "Некорректная структура traits" });
-    }
-    if (!character.resources) {
-      errors.push({ path: "resources", message: "Некорректная структура ресурсов" });
-    }
-    if (!character.derived) {
-      errors.push({ path: "derived", message: "Некорректная структура derived" });
-    }
-
-    if (errors.length > 0) {
-      res.status(400).json({ errors });
-      return;
-    }
-
-    character.version += 1;
-    await character.save();
-    res.json({ ok: true });
   })
 );
 

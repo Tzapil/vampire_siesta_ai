@@ -27,8 +27,9 @@
 
 ### HTTP routes
 - `apps/server/src/routes/characters.ts`
+- `apps/server/src/routes/chronicles.ts`
 - Used in:
-  - `POST /characters/:uuid/import` -> `validateAllWizardSteps`
+  - `POST /chronicles/:id/characters/import` -> `validateAllWizardSteps`
   - `POST /characters/:uuid/wizard/next` -> `validateWizardStep`
   - `POST /characters/:uuid/wizard/finish` -> `validateAllWizardSteps`
   - `POST /characters/:uuid/wizard/finish` -> `computeRemainingFreebies`, `getLayer`

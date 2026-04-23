@@ -2859,6 +2859,14 @@ button:disabled {
   align-items: start;
 }
 
+.home-character-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.home-character-grid .home-empty {
+  grid-column: 1 / -1;
+}
+
 .character-card {
   background: #0c1524;
   border: 1px solid #1b2a44;

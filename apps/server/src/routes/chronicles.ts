@@ -7,10 +7,32 @@ import {
   CombatStateModel
 } from "../db";
 import { asyncHandler } from "../utils/asyncHandler";
-import { presentCharacterList } from "../utils/characterPresenter";
+import { presentCharacter, presentCharacterList } from "../utils/characterPresenter";
+import { sanitizeCharacterForChronicleImport } from "../utils/characterTransfer";
+import { generateUuid } from "../utils/uuid";
+import { loadDictionaries, validateAllWizardSteps } from "../validation/characterValidation";
 
 const router = Router();
 const MAX_CHRONICLE_IMAGE_LENGTH = 7_000_000;
+
+function collectCharacterStructureErrors(character: any) {
+  const errors: Array<{ path: string; message: string }> = [];
+
+  if (!character.traits?.attributes || !character.traits?.abilities || !character.traits?.disciplines) {
+    errors.push({ path: "traits", message: "Некорректная структура traits" });
+  }
+  if (!character.traits?.backgrounds || !character.traits?.virtues) {
+    errors.push({ path: "traits", message: "Некорректная структура traits" });
+  }
+  if (!character.resources) {
+    errors.push({ path: "resources", message: "Некорректная структура ресурсов" });
+  }
+  if (!character.derived) {
+    errors.push({ path: "derived", message: "Некорректная структура derived" });
+  }
+
+  return errors;
+}
 
 router.get(
   "/chronicles",
@@ -100,6 +122,56 @@ router.get(
     });
 
     res.json(await presentCharacterList(sorted));
+  })
+);
+
+router.post(
+  "/chronicles/:id/characters/import",
+  asyncHandler(async (req, res) => {
+    const authUser = req.auth?.user;
+    if (!authUser) {
+      res.status(401).json({ message: "Требуется авторизация" });
+      return;
+    }
+
+    if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+      res.status(400).json({ errors: [{ path: "body", message: "Неверный формат JSON" }] });
+      return;
+    }
+
+    const chronicle = await ChronicleModel.findOne({
+      _id: req.params.id,
+      deleted: { $ne: true }
+    }).lean();
+    if (!chronicle) {
+      res.status(404).json({ message: "Хроника не найдена" });
+      return;
+    }
+
+    const payload = sanitizeCharacterForChronicleImport(req.body as Record<string, unknown>, {
+      uuid: generateUuid(),
+      chronicleId: chronicle._id,
+      createdByUserId: authUser.id,
+      createdByDisplayName: authUser.displayName,
+      playerName: authUser.displayName
+    });
+    const character = new CharacterModel(payload);
+
+    const dict = await loadDictionaries();
+    const errors = await validateAllWizardSteps(character, dict, {
+      mutate: false,
+      chronicleExists: async (chronicleId) => String(chronicleId) === String(chronicle._id)
+    });
+    errors.push(...collectCharacterStructureErrors(character));
+
+    if (errors.length > 0) {
+      res.status(400).json({ errors });
+      return;
+    }
+
+    await character.save();
+    const plain = character.toObject({ flattenMaps: true });
+    res.status(201).json(await presentCharacter(plain));
   })
 );
 

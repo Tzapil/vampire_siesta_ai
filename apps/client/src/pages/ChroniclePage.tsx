@@ -25,6 +25,7 @@ export default function ChroniclePage() {
   const { pushToast } = useToast();
   const { dictionaries } = useDictionaries();
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -224,6 +225,23 @@ export default function ChroniclePage() {
     }
   };
 
+  const handleImportFile = async (file?: File | null) => {
+    if (!file || !chronicle) return;
+    try {
+      const text = await file.text();
+      const json = JSON.parse(text);
+      const character = await api.post<CharacterDto>(
+        `/chronicles/${chronicle._id}/characters/import`,
+        json
+      );
+      pushToast("Импорт выполнен", "success");
+      navigate(`/c/${character.uuid}`);
+    } catch (err: any) {
+      const message = err?.errors?.[0]?.message || err?.message || "Ошибка импорта";
+      pushToast(message, "error");
+    }
+  };
+
   
   const handleDeleteChronicle = async () => {
     if (!chronicle) return;
@@ -272,6 +290,15 @@ export default function ChroniclePage() {
             <button
               type="button"
               className="icon-button"
+              title="Импортировать персонажа JSON"
+              aria-label="Импортировать персонажа JSON"
+              onClick={() => importInputRef.current?.click()}
+            >
+              ⤒
+            </button>
+            <button
+              type="button"
+              className="icon-button"
               title={combat?.active ? "Перейти к бою" : "Начать бой"}
               aria-label={combat?.active ? "Перейти к бою" : "Начать бой"}
               onClick={async () => {
@@ -308,6 +335,17 @@ export default function ChroniclePage() {
             {combat.active ? "Бой активен" : "Бой не начат"}
           </div>
         )}
+        <input
+          ref={importInputRef}
+          type="file"
+          accept="application/json"
+          style={{ display: "none" }}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            handleImportFile(file);
+            event.target.value = "";
+          }}
+        />
       </div>
       <div className="card">
         <div className="section-title">Персонажи</div>
@@ -461,7 +499,6 @@ export default function ChroniclePage() {
     </section>
   );
 }
-
 
 
 
