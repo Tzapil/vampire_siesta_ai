@@ -146,10 +146,10 @@
 ## Docker И Деплой
 
 - `Dockerfile` отдельно собирает клиент и сервер, а затем запускает собранный сервер в production.
-- `docker-compose.yml` поднимает `mongo` и `app`.
+- `docker-compose.yml` поднимает `mongo` и `app`, а профиль `https` добавляет контейнерный `nginx` на `80/443`.
 - Compose выставляет `NODE_ENV=production` и раздаёт статический клиент через сервер.
-- Compose запускает Mongo с `mongod --auth`, поэтому `MONGO_URL` должен соответствовать реальной схеме авторизации, которую вы используете.
-- `deploy/nginx/vampire-siesta.example.conf` содержит пример reverse-proxy-конфига.
+- Compose запускает Mongo с `mongod --auth` и на первом старте может создать root-пользователя через `MONGO_INITDB_ROOT_USERNAME` / `MONGO_INITDB_ROOT_PASSWORD`; контейнер `app` в compose получает строку подключения из `COMPOSE_MONGO_URL`, чтобы не конфликтовать с локальным `MONGO_URL`.
+- `deploy/nginx/vampire-siesta.example.conf` содержит пример reverse-proxy-конфига для `nginx` на хосте, а `deploy/nginx/vampire-siesta.docker.conf` — для `nginx` в Docker Compose.
 
 ## Куда Вносить Изменения
 

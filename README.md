@@ -16,6 +16,9 @@
 ```env
 PORT=4000
 MONGO_URL=mongodb://localhost:27017/siesta
+MONGO_INITDB_ROOT_USERNAME=admin
+MONGO_INITDB_ROOT_PASSWORD=change-me
+COMPOSE_MONGO_URL=mongodb://admin:change-me@mongo:27017/siesta?authSource=admin
 NODE_ENV=development
 ALLOWED_ORIGINS=http://localhost:5173
 SESSION_COOKIE_NAME=vs_session
@@ -35,6 +38,8 @@ VALIDATION_SIDE_BY_SIDE=0
 Дополнительно:
 
 - `CLIENT_DIST_PATH` — путь до собранного клиента. Нужен, если вы запускаете сервер НЕ из корня репозитория.
+- `MONGO_INITDB_ROOT_USERNAME`, `MONGO_INITDB_ROOT_PASSWORD` — используются контейнером `mongo` в `docker-compose` для создания root-пользователя при первом старте с пустым volume.
+- `COMPOSE_MONGO_URL` — строка подключения, которую `docker-compose` передаёт контейнеру `app`. Это отдельная переменная, чтобы docker-сеть с хостом `mongo` не конфликтовала с локальным `MONGO_URL=...localhost...`.
 - `NODE_ENV=production` — включает раздачу клиента сервером.
 - `ALLOWED_ORIGINS` — список origin через запятую для CORS/Socket.IO. В dev обычно достаточно `http://localhost:5173`.
 - `SESSION_COOKIE_NAME`, `SESSION_TTL_DAYS`, `SESSION_SECURE`, `SESSION_SAMESITE` — параметры cookie-сессии.
@@ -146,11 +151,15 @@ set CLIENT_DIST_PATH=D:\projects\siesta_ai\apps\client\dist
 copy .env.example .env
 ```
 
-Отредактируйте `MONGO_URL` при необходимости. Для docker‑compose можно использовать:
+Для `docker-compose` по умолчанию используется root-пользователь Mongo. В `.env` можно оставить такие значения:
 
 ```env
-MONGO_URL=mongodb://mongo:27017/siesta
+MONGO_INITDB_ROOT_USERNAME=admin
+MONGO_INITDB_ROOT_PASSWORD=change-me
+COMPOSE_MONGO_URL=mongodb://admin:change-me@mongo:27017/siesta?authSource=admin
 ```
+
+Пользователь создаётся только при первом старте Mongo с пустым `mongo-data`. Если volume уже существует, новые `MONGO_INITDB_*` не применятся автоматически.
 
 ### 2) Сборка и запуск
 
@@ -158,7 +167,9 @@ MONGO_URL=mongodb://mongo:27017/siesta
 docker compose up -d --build
 ```
 
-Сервис `app` слушает `PORT` (по умолчанию 4000). Статический клиент раздаётся сервером.
+По умолчанию `app` доступен только на `http://127.0.0.1:4000`, а `mongo` на `127.0.0.1:27017`. Статический клиент раздаётся сервером.
+
+Для публичного HTTPS на `80/443` используйте профиль `https`, описанный в подробном VPS-гайде ниже.
 
 ### 3) Остановка
 
@@ -166,98 +177,286 @@ docker compose up -d --build
 docker compose down
 ```
 
-## VPS запуск (рекомендуемый вариант: Docker Compose)
+## Пошаговый деплой на VPS (Docker Compose + nginx + Let's Encrypt)
 
-### Что установить на VPS
+Ниже описан рекомендуемый production-сценарий для VPS:
 
-- Docker Engine
-- Docker Compose (plugin)
-- Git
+- `mongo` и `app` живут в `docker-compose`,
+- `app` слушает только `127.0.0.1:4000`,
+- контейнерный `nginx` публикует наружу `80/443`,
+- TLS-сертификаты выпускаются `certbot` на хосте и монтируются в контейнер из `/etc/letsencrypt`.
 
-### 1) Клонирование и подготовка
+### Что должно быть готово заранее
+
+- VPS с публичным IPv4-адресом.
+- Домен или поддомен, которым вы управляете.
+- На VPS уже установлены `Docker Engine`, `Docker Compose (plugin)`, `Git`, `snapd`.
+- Во внешнем фаерволе и на самом VPS открыты порты `80` и `443` для HTTP/HTTPS и `22` для SSH.
+
+### Шаг 1. Настройте DNS домена
+
+- Создайте `A`-запись домена на IP вашего VPS.
+- Если хотите обслуживать и `www`, создайте отдельную запись для `www`.
+- Дождитесь, пока домен начнёт резолвиться на ваш VPS.
+
+Примеры:
+
+- `example.com -> 203.0.113.10`
+- `www.example.com -> 203.0.113.10`
+
+Если используете поддомен вроде `app.example.com`, везде дальше подставляйте именно его: в `nginx`, в `ALLOWED_ORIGINS`, в OAuth callback URL и в команде `certbot`.
+
+### Шаг 2. Подготовьте сервер и репозиторий
 
 ```bash
-git clone <ваш-репозиторий>
-cd siesta_ai
-copy .env.example .env
+cd /opt
+sudo git clone <ваш-репозиторий> siesta_ai
+sudo chown -R $USER:$USER /opt/siesta_ai
+cd /opt/siesta_ai
+cp .env.example .env
 ```
 
-Отредактируйте `.env`:
+Если проект уже склонирован, просто перейдите в каталог репозитория.
 
-```env
-PORT=4000
-MONGO_URL=mongodb://mongo:27017/siesta
-```
+### Шаг 3. Заполните `.env`
 
-### 2) Запуск
-
-```bash
-docker compose up -d --build
-```
-
-### 3) Обновление версии
-
-```bash
-git pull
-
-docker compose up -d --build
-```
-
-### 4) Порты и доступ
-
-- Откройте входящий порт `PORT` (обычно 4000) на фаерволе.
-- Для домена обычно ставят reverse‑proxy (Nginx/Caddy). В этом случае проксируйте запросы на `http://127.0.0.1:4000`.
-
-## Nginx: HTTPS reverse proxy
-
-Если приложение работает в production за `nginx`, самый простой вариант такой:
-
-- `nginx` принимает HTTPS на `443`,
-- Node/Express слушает только локальный `127.0.0.1:4000`,
-- `nginx` проксирует и обычные HTTP-запросы, и `Socket.IO`,
-- клиентская статика продолжает раздаваться самим приложением.
-
-### Рекомендуемые env для production
+Для VPS с `docker-compose` удобно начать с такого шаблона:
 
 ```env
 NODE_ENV=production
 PORT=4000
-MONGO_URL=mongodb://localhost:27017/siesta
+
+MONGO_INITDB_ROOT_USERNAME=admin
+MONGO_INITDB_ROOT_PASSWORD=replace-with-strong-password
+COMPOSE_MONGO_URL=mongodb://admin:replace-with-strong-password@mongo:27017/siesta?authSource=admin
+MONGO_URL=mongodb://admin:replace-with-strong-password@127.0.0.1:27017/siesta?authSource=admin
+
+ALLOWED_ORIGINS=https://example.com
+SESSION_COOKIE_NAME=vs_session
+SESSION_TTL_DAYS=7
 SESSION_SECURE=true
 SESSION_SAMESITE=lax
-ALLOWED_ORIGINS=https://example.com
+
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
 GOOGLE_REDIRECT_URI=https://example.com/api/auth/google/callback
+
+YANDEX_CLIENT_ID=
+YANDEX_CLIENT_SECRET=
 YANDEX_REDIRECT_URI=https://example.com/api/auth/yandex/callback
+
+VALIDATION_ENGINE_V2=1
+VALIDATION_SIDE_BY_SIDE=0
 ```
 
-Если приложение доступно только с одного публичного origin, обычно достаточно указать именно его.
+Что здесь важно:
 
-### Пример конфига `nginx`
+- `COMPOSE_MONGO_URL` использует хост `mongo`, потому что контейнер `app` подключается к Mongo внутри docker-сети.
+- `MONGO_URL` нужен для команд, которые вы запускаете с самого VPS, например для локального `npm run seed`, если когда-нибудь будете это делать вне контейнера.
+- `MONGO_INITDB_ROOT_USERNAME` и `MONGO_INITDB_ROOT_PASSWORD` создают root-пользователя Mongo только при первом старте с пустым volume `mongo-data`.
+- Если хотите принимать трафик и на `https://example.com`, и на `https://www.example.com`, укажите оба origin через запятую:
+  `ALLOWED_ORIGINS=https://example.com,https://www.example.com`
+- OAuth callback URL должны совпадать и в `.env`, и в настройках приложения у Google/Яндекса.
+- Если не настроен ни один OAuth-провайдер, сервер поднимется, но войти в приложение будет нельзя.
 
-Готовый пример вынесен в отдельный файл:
+### Шаг 4. Настройте домен в `nginx`
 
-- [deploy/nginx/vampire-siesta.example.conf](/Users/tzapil/projects/vampire_siesta_ai/deploy/nginx/vampire-siesta.example.conf)
+Откройте [deploy/nginx/vampire-siesta.docker.conf](deploy/nginx/vampire-siesta.docker.conf) и замените тестовые значения:
 
-Скопируйте его в `/etc/nginx/sites-available/`, замените домен `example.com` и пути к сертификатам, затем подключите через symlink в `sites-enabled`.
+- в обоих `server_name` вместо `example.com www.example.com` укажите свой домен;
+- в `ssl_certificate` и `ssl_certificate_key` укажите путь, соответствующий имени сертификата.
 
-### Что важно для этого проекта
+Пример для одного домена:
 
-- Приложение уже умеет работать за proxy: в Express включен `trust proxy`, поэтому `SESSION_SECURE=true` за `nginx` будет работать корректно.
-- OAuth redirect URI должны указывать на публичный HTTPS-домен, а не на внутренний `127.0.0.1:4000`.
-- `Socket.IO` требует `Upgrade`/`Connection` headers, поэтому секцию `/socket.io/` лучше выделять явно.
-- `client_max_body_size` лучше держать не меньше `15m`, потому что сервер принимает JSON до `15mb`, а в приложении есть загрузка изображений/аватаров.
-- Порт приложения `4000` лучше не открывать наружу, если доступ к нему идет только через `nginx`.
+```nginx
+server_name app.example.com;
+ssl_certificate     /etc/letsencrypt/live/app.example.com/fullchain.pem;
+ssl_certificate_key /etc/letsencrypt/live/app.example.com/privkey.pem;
+```
 
-### Перезапуск после изменения конфига
+Пример для домена и `www`:
 
-Проверка конфига и reload:
+```nginx
+server_name example.com www.example.com;
+ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;
+ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+```
+
+Важно: каталог `/etc/letsencrypt/live/<name>/` должен совпадать с тем, как `certbot` назовёт сертификат. Обычно это имя первого домена в команде `certbot`.
+
+### Шаг 5. Первый запуск `mongo` и `app`
+
+Сначала поднимите базовый стек без `nginx`:
 
 ```bash
-sudo nginx -t
-sudo systemctl reload nginx
+docker compose up -d --build
 ```
 
-Если используете `certbot`, после выпуска сертификата обычно достаточно снова выполнить `nginx -t` и `reload`.
+Проверьте, что контейнеры стартовали:
+
+```bash
+docker compose ps
+docker compose logs --tail=100 app
+```
+
+На этом этапе:
+
+- `app` будет слушать только `127.0.0.1:4000`,
+- `mongo` будет слушать только `127.0.0.1:27017`,
+- снаружи VPS приложение ещё не доступно.
+
+Нюанс по Mongo:
+
+- root-пользователь `admin` создаётся только один раз, при первом старте с пустым volume;
+- если вы уже запускали Mongo раньше и меняете `MONGO_INITDB_ROOT_PASSWORD`, контейнер не пересоздаст пользователя автоматически;
+- в таком случае либо создайте пользователя вручную, либо удалите volume через `docker compose down -v`, если данные можно потерять.
+
+### Шаг 6. Выполните `seed`
+
+После первого старта приложения заполните справочники и создайте дефолтную хронику:
+
+```bash
+docker compose exec app node apps/server/dist/seed.js
+```
+
+Если команда прошла без ошибок, база инициализирована. `seed` можно запускать повторно после изменений в `data/*.json`.
+
+Если контейнер `app` ещё не успел подняться, сначала посмотрите:
+
+```bash
+docker compose logs --tail=100 app
+```
+
+### Шаг 7. Выпустите TLS-сертификаты Let's Encrypt
+
+Сертификаты выпускаются на хосте, а контейнер `nginx` потом получает их через bind mount `/etc/letsencrypt:/etc/letsencrypt:ro`.
+
+Установка `certbot`:
+
+```bash
+sudo apt update
+sudo apt install -y snapd
+sudo snap install --classic certbot
+sudo ln -sf /snap/bin/certbot /usr/local/bin/certbot
+```
+
+Выпуск сертификата для домена и `www`:
+
+```bash
+sudo certbot certonly --standalone -d example.com -d www.example.com
+```
+
+Выпуск сертификата только для поддомена:
+
+```bash
+sudo certbot certonly --standalone -d app.example.com
+```
+
+Что важно перед запуском `certbot`:
+
+- домен уже должен резолвиться на ваш VPS;
+- порты `80` и `443` должны быть открыты;
+- на этих портах не должно быть другого процесса;
+- базовый `docker compose up` этому не мешает, потому что `app` слушает только `127.0.0.1:4000`.
+
+После успешного выпуска сертификаты появятся в каталоге вида:
+
+```text
+/etc/letsencrypt/live/example.com/fullchain.pem
+/etc/letsencrypt/live/example.com/privkey.pem
+```
+
+или:
+
+```text
+/etc/letsencrypt/live/app.example.com/fullchain.pem
+/etc/letsencrypt/live/app.example.com/privkey.pem
+```
+
+### Шаг 8. Поднимите `nginx` с HTTPS
+
+Когда сертификаты уже существуют и `deploy/nginx/vampire-siesta.docker.conf` настроен, поднимите профиль `https`:
+
+```bash
+docker compose --profile https up -d
+```
+
+Проверьте контейнер и логи:
+
+```bash
+docker compose ps
+docker compose logs --tail=100 nginx
+```
+
+После этого приложение должно открываться по `https://ваш-домен`.
+
+### Шаг 9. Проверьте домен, HTTPS и авторизацию
+
+Минимальная проверка:
+
+```bash
+curl -I https://example.com
+```
+
+Ожидаемое поведение:
+
+- открывается главная страница по HTTPS;
+- браузер не ругается на сертификат;
+- редирект с `http://` идёт на `https://`;
+- логин через OAuth уводит на тот же домен, который указан в `*_REDIRECT_URI`.
+
+Если OAuth не работает, почти всегда проблема в одном из трёх мест:
+
+- неверный `GOOGLE_REDIRECT_URI` или `YANDEX_REDIRECT_URI` в `.env`;
+- тот же URI не добавлен в консоли OAuth-провайдера;
+- `ALLOWED_ORIGINS` не совпадает с реальным браузерным origin.
+
+### Шаг 10. Настройте продление сертификатов
+
+Проверьте, что продление работает:
+
+```bash
+sudo certbot renew --dry-run
+```
+
+После реального продления `nginx` в контейнере нужно перечитать сертификаты:
+
+```bash
+cd /opt/siesta_ai
+docker compose exec -T nginx nginx -s reload
+```
+
+Если хотите автоматизировать это, добавьте cron-задачу на хосте:
+
+```cron
+15 4 * * * root cd /opt/siesta_ai && certbot renew --quiet && docker compose exec -T nginx nginx -s reload
+```
+
+Если `cron` не видит `docker compose` или `certbot`, укажите для них полные пути.
+
+### Шаг 11. Обновление приложения на VPS
+
+Обычный сценарий обновления:
+
+```bash
+cd /opt/siesta_ai
+git pull
+docker compose --profile https up -d --build
+docker compose exec app node apps/server/dist/seed.js
+```
+
+Последний шаг полезен после изменений в `data/*.json` или в логике сидирования.
+
+### Что важно именно для этого проекта
+
+- Express уже работает с proxy через `trust proxy`, поэтому `SESSION_SECURE=true` за `nginx` поддерживается корректно.
+- Для `Socket.IO` в `nginx` уже настроены `Upgrade` и `Connection` headers.
+- `client_max_body_size` в конфиге `nginx` выставлен с запасом для JSON и загрузки аватаров.
+- Порт `4000` не нужно открывать наружу: публичный доступ идёт только через `nginx`.
+
+### Альтернатива: `nginx` на хосте
+
+Если не хотите держать `nginx` в `docker-compose`, используйте [deploy/nginx/vampire-siesta.example.conf](deploy/nginx/vampire-siesta.example.conf) как базовый конфиг для системного `nginx` на хосте. Логика `.env`, OAuth и сертификатов остаётся той же, меняется только место, где живёт сам reverse proxy.
 
 ## VPS запуск без Docker (Node + MongoDB)
 

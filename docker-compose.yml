@@ -1,12 +1,15 @@
-﻿services:
+services:
   mongo:
     image: mongo:6
     restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-change-me}
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongo-data:/data/db
-    command: ["mongod","--auth"]
+    command: ["mongod", "--auth"]
 
   app:
     build: .
@@ -17,12 +20,27 @@
       - .env
     environment:
       NODE_ENV: production
-      PORT: ${PORT:-4000}
-      MONGO_URL: ${MONGO_URL:-mongodb://mongo:27017/siesta}
+      PORT: 4000
+      MONGO_URL: ${COMPOSE_MONGO_URL:-mongodb://admin:change-me@mongo:27017/siesta?authSource=admin}
       CLIENT_DIST_PATH: /app/client-dist
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4000:4000"
+    expose:
+      - "4000"
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    profiles:
+      - https
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/vampire-siesta.docker.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
 
 volumes:
   mongo-data:
-
