@@ -1,4 +1,5 @@
 export { ChronicleModel } from "./models/Chronicle";
+export { ChronicleNpcLinkModel } from "./models/ChronicleNpcLink";
 export { ChronicleImageModel } from "./models/ChronicleImage";
 export { ChronicleLogModel } from "./models/ChronicleLog";
 export { CombatStateModel } from "./models/CombatState";
@@ -17,6 +18,7 @@ export {
 export { MeritModel } from "./models/Merit";
 export { FlawModel } from "./models/Flaw";
 export { CharacterModel } from "./models/Character";
+export { NpcModel } from "./models/Npc";
 export { UserModel } from "./models/User";
 export { SessionModel } from "./models/Session";
 export { UserAvatarModel } from "./models/UserAvatar";

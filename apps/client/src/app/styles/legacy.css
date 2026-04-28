@@ -2852,15 +2852,25 @@ button:disabled {
 }
 
 .chronicle-character-grid {
+  --character-card-width: 200px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(min(100%, var(--character-card-width)), var(--character-card-width))
+  );
   gap: 12px;
   margin-top: 12px;
-  align-items: start;
+  align-items: stretch;
+  justify-content: start;
 }
 
 .home-character-grid {
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  --character-card-width: 200px;
+}
+
+.chronicle-character-grid > .home-empty,
+.chronicle-character-grid > p {
+  grid-column: 1 / -1;
 }
 
 .home-character-grid .home-empty {
@@ -2873,7 +2883,10 @@ button:disabled {
   border-radius: 12px;
   padding: 12px;
   display: grid;
+  grid-template-rows: auto 1fr;
   gap: 8px;
+  min-height: 132px;
+  height: 100%;
   color: inherit;
   transition: border-color 0.15s ease, transform 0.15s ease;
 }
@@ -3523,6 +3536,436 @@ button.secondary {
   color: var(--theme-muted);
 }
 
+.npc-link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--theme-border);
+  text-decoration: none;
+}
+
+.npc-link-button.primary {
+  background: var(--theme-accent);
+  color: #1b1408;
+  border-color: rgba(0, 0, 0, 0.2);
+  box-shadow: 0 12px 22px rgba(217, 181, 108, 0.25);
+}
+
+.npc-link-button.primary:hover {
+  background: var(--theme-accent-strong);
+}
+
+.home-npc-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.npc-summary {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.npc-summary-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.npc-summary-body h1 {
+  margin: 0;
+}
+
+.npc-detail-avatar {
+  width: 88px;
+  height: 88px;
+  border-radius: 18px;
+  border: 1px solid var(--theme-border);
+  background: var(--theme-surface-3);
+  object-fit: cover;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--theme-muted);
+  font-size: 32px;
+}
+
+.npc-detail-avatar.placeholder {
+  font-weight: 700;
+}
+
+.npc-resource-grid {
+  align-items: stretch;
+}
+
+.npc-stat-card {
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--theme-border);
+  background: var(--theme-surface-2);
+  display: grid;
+  gap: 8px;
+}
+
+.npc-stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--theme-muted);
+}
+
+.npc-health-card {
+  grid-column: 1 / -1;
+}
+
+.npc-editor-resources {
+  align-items: start;
+}
+
+.npc-editor-page {
+  gap: 18px;
+}
+
+.npc-editor-hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.npc-editor-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(540px 220px at 0% 0%, rgba(217, 181, 108, 0.18), transparent 68%),
+    radial-gradient(420px 220px at 100% 0%, rgba(96, 200, 255, 0.12), transparent 72%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.04), transparent 46%);
+  pointer-events: none;
+}
+
+.npc-editor-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.npc-editor-hero-header {
+  align-items: center;
+  gap: 18px;
+}
+
+.npc-editor-title-block {
+  gap: 8px;
+}
+
+.npc-editor-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--theme-accent-strong);
+}
+
+.npc-editor-subtitle {
+  margin: 0;
+  max-width: 640px;
+  color: rgba(243, 237, 226, 0.72);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.npc-editor-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.npc-editor-section-head p {
+  margin: 6px 0 0;
+  max-width: 760px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--theme-muted);
+}
+
+.npc-editor-identity-grid {
+  display: grid;
+  grid-template-columns: minmax(168px, 196px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.npc-editor-avatar-panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(217, 181, 108, 0.12);
+  background:
+    radial-gradient(180px 140px at 15% 0%, rgba(217, 181, 108, 0.08), transparent 75%),
+    rgba(8, 10, 14, 0.22);
+}
+
+.npc-editor-avatar-label,
+.npc-editor-main-fields .field > span {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(243, 237, 226, 0.62);
+}
+
+.npc-editor-avatar-frame {
+  width: 100%;
+  max-width: 152px;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 18px;
+  box-shadow: inset 0 0 0 1px rgba(217, 181, 108, 0.14), 0 18px 34px rgba(4, 7, 12, 0.32);
+}
+
+.npc-editor-avatar-frame img {
+  border-radius: 16px;
+}
+
+.npc-editor-main-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.npc-editor-name-field {
+  grid-column: 1 / -1;
+}
+
+.npc-editor-main-fields .field input,
+.npc-editor-main-fields .field select {
+  min-height: 52px;
+  padding: 12px 14px;
+  border-radius: 12px;
+}
+
+.npc-editor-traits-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.88fr) minmax(280px, 1.12fr) minmax(280px, 1.12fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.npc-editor-traits-column {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.npc-editor-page .wizard-attr-card {
+  padding: 14px;
+  gap: 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 45%),
+    var(--theme-surface-2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.npc-editor-page .wizard-attr-card-header {
+  font-size: 13px;
+  letter-spacing: 0.18em;
+}
+
+.npc-editor-page .wizard-attr-list {
+  gap: 10px;
+}
+
+.npc-editor-page .wizard-attr-row {
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 48px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.npc-editor-page .wizard-attr-row:hover {
+  border-color: rgba(217, 181, 108, 0.42);
+  background: rgba(255, 255, 255, 0.02);
+  transform: translateY(-1px);
+}
+
+.npc-editor-page .wizard-attr-label {
+  align-items: flex-start;
+  line-height: 1.35;
+}
+
+.npc-editor-page .wizard-attr-label > span:first-child {
+  min-width: 0;
+}
+
+.npc-editor-page .wizard-attr-row .dots {
+  margin-left: auto;
+  padding-top: 2px;
+}
+
+.npc-editor-page .wizard-attr-row .dot {
+  width: 13px;
+  height: 13px;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.npc-editor-page .wizard-attr-row .dot:hover {
+  transform: scale(1.08);
+  border-color: var(--theme-accent);
+}
+
+.npc-editor-page .st-actions {
+  margin-left: auto;
+}
+
+.npc-editor-bottom-grid {
+  display: grid;
+  grid-template-columns: minmax(340px, 0.95fr) minmax(0, 1.05fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.npc-editor-resource-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+.npc-editor-resource-card {
+  min-height: 0;
+  padding: 16px;
+  gap: 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 45%),
+    var(--theme-surface-2);
+}
+
+.npc-editor-resource-card input {
+  min-height: 48px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 16px;
+}
+
+.npc-editor-resource-card small {
+  color: var(--theme-muted);
+  line-height: 1.45;
+}
+
+.npc-editor-health-card .field {
+  gap: 10px;
+}
+
+.npc-editor-health-card .health-track {
+  width: fit-content;
+}
+
+.npc-editor-health-card .field small {
+  font-size: 12px;
+}
+
+.npc-editor-notes-card {
+  min-height: 100%;
+}
+
+.npc-editor-notes-card .field {
+  height: 100%;
+}
+
+.npc-editor-notes {
+  min-height: 320px;
+  height: 100%;
+  padding: 14px;
+  border-radius: 14px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.npc-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  padding: 24px;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 10, 14, 0.82);
+}
+
+.npc-modal-content {
+  width: min(760px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  display: grid;
+  gap: 14px;
+}
+
+.npc-picker-list,
+.npc-inline-list {
+  display: grid;
+  gap: 10px;
+}
+
+.npc-picker-item,
+.npc-inline-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--theme-border);
+  background: var(--theme-surface-2);
+}
+
+.npc-inline-link {
+  color: inherit;
+  text-decoration: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.npc-inline-link:hover .character-card-name {
+  text-decoration: underline;
+}
+
+@media (max-width: 1120px) {
+  .npc-editor-traits-layout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .npc-editor-traits-column-compact {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .npc-editor-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 860px) {
+  .npc-editor-identity-grid,
+  .npc-editor-main-fields,
+  .npc-editor-traits-layout,
+  .npc-editor-traits-column-compact,
+  .npc-editor-resource-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .npc-editor-avatar-panel {
+    justify-items: start;
+  }
+}
+
 @media (max-width: 720px) {
   .app-main {
     padding: 16px;
@@ -3591,6 +4034,42 @@ button.secondary {
   .profile-provider-chip {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .home-npc-cta,
+  .npc-summary,
+  .npc-picker-item,
+  .npc-inline-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .npc-link-button {
+    width: 100%;
+  }
+
+  .npc-editor-hero-header .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .npc-editor-section-head {
+    margin-bottom: 12px;
+  }
+
+  .npc-editor-section-head p,
+  .npc-editor-subtitle {
+    font-size: 13px;
+  }
+
+  .npc-editor-avatar-panel,
+  .npc-editor-page .wizard-attr-card,
+  .npc-editor-resource-card {
+    padding: 14px;
+  }
+
+  .npc-editor-notes {
+    min-height: 240px;
   }
 }
 

@@ -16,6 +16,13 @@ type PatchAppliedPayload = {
   version: number;
 };
 
+type PatchConfirmedPayload = {
+  characterUuid: string;
+  path: string;
+  value: unknown;
+  version: number;
+};
+
 type ResyncPayload = {
   reason?: "rollback" | "server-change";
 };
@@ -25,6 +32,7 @@ export function useCharacterSocket(
   options?: {
     currentVersion?: number;
     onPatchApplied?: (payload: PatchAppliedPayload) => void;
+    onPatchConfirmed?: (payload: PatchConfirmedPayload) => void;
     onResync?: (payload: ResyncPayload) => void;
     onReject?: (errors: Array<{ path: string; message: string }>) => void;
   }
@@ -36,21 +44,25 @@ export function useCharacterSocket(
   }, []);
   const socketRef = useRef<Socket | null>(null);
   const onPatchAppliedRef = useRef(options?.onPatchApplied);
+  const onPatchConfirmedRef = useRef(options?.onPatchConfirmed);
   const onResyncRef = useRef(options?.onResync);
   const onRejectRef = useRef(options?.onReject);
   const versionRef = useRef<number | null>(options?.currentVersion ?? null);
   const pendingRef = useRef(false);
   const queueRef = useRef<Array<Omit<PatchPayload, "baseVersion">>>([]);
 
-  if (typeof options?.currentVersion === "number") {
-    versionRef.current = options.currentVersion;
-  }
+  useEffect(() => {
+    if (typeof options?.currentVersion === "number") {
+      versionRef.current = options.currentVersion;
+    }
+  }, [options?.currentVersion]);
 
   useEffect(() => {
     onPatchAppliedRef.current = options?.onPatchApplied;
+    onPatchConfirmedRef.current = options?.onPatchConfirmed;
     onResyncRef.current = options?.onResync;
     onRejectRef.current = options?.onReject;
-  }, [options?.onPatchApplied, options?.onResync, options?.onReject]);
+  }, [options?.onPatchApplied, options?.onPatchConfirmed, options?.onResync, options?.onReject]);
 
   useEffect(() => {
     if (!uuid) return;
@@ -114,6 +126,12 @@ export function useCharacterSocket(
 
       if (typeof response?.newVersion === "number") {
         versionRef.current = response.newVersion;
+        onPatchConfirmedRef.current?.({
+          characterUuid: next.characterUuid,
+          path: next.path,
+          value: next.value,
+          version: response.newVersion
+        });
       }
       pendingRef.current = false;
       if (response?.resync) {

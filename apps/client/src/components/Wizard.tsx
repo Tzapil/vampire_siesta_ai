@@ -1,4 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
+import { useCallback, useRef, type InputHTMLAttributes } from "react";
 import { api, ApiError } from "../api/client";
 import type {
   AbilityDto,
@@ -111,6 +112,88 @@ function DotsInput({
 
 function StepHeader({ title }: { title: string }) {
   return <h3 className="section-title">{title}</h3>;
+}
+
+type BufferedTextInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange"> & {
+  value: string;
+  onCommit: (next: string) => void;
+  debounceMs?: number;
+};
+
+function BufferedTextInput({
+  value,
+  onCommit,
+  debounceMs = 350,
+  onBlur,
+  onFocus,
+  ...props
+}: BufferedTextInputProps) {
+  const [draft, setDraft] = useState(value);
+  const draftRef = useRef(value);
+  const lastSubmittedRef = useRef(value);
+  const valueRef = useRef(value);
+  const focusedRef = useRef(false);
+  const timeoutRef = useRef<number | null>(null);
+
+  const clearPendingCommit = useCallback(() => {
+    if (timeoutRef.current !== null) {
+      window.clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
+  const commitDraft = useCallback(() => {
+    clearPendingCommit();
+    const nextValue = draftRef.current;
+    if (nextValue === valueRef.current || nextValue === lastSubmittedRef.current) {
+      return;
+    }
+    lastSubmittedRef.current = nextValue;
+    onCommit(nextValue);
+  }, [clearPendingCommit, onCommit]);
+
+  useEffect(() => {
+    valueRef.current = value;
+    lastSubmittedRef.current = value;
+    if (!focusedRef.current || value === draftRef.current) {
+      draftRef.current = value;
+      setDraft(value);
+    }
+  }, [value]);
+
+  useEffect(() => clearPendingCommit, [clearPendingCommit]);
+
+  return (
+    <input
+      {...props}
+      value={draft}
+      onChange={(event) => {
+        const nextValue = event.target.value;
+        draftRef.current = nextValue;
+        setDraft(nextValue);
+        clearPendingCommit();
+        timeoutRef.current = window.setTimeout(() => {
+          timeoutRef.current = null;
+          if (
+            draftRef.current !== valueRef.current &&
+            draftRef.current !== lastSubmittedRef.current
+          ) {
+            lastSubmittedRef.current = draftRef.current;
+            onCommit(draftRef.current);
+          }
+        }, debounceMs);
+      }}
+      onFocus={(event) => {
+        focusedRef.current = true;
+        onFocus?.(event);
+      }}
+      onBlur={(event) => {
+        focusedRef.current = false;
+        commitDraft();
+        onBlur?.(event);
+      }}
+    />
+  );
 }
 
 export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProps) {
@@ -327,58 +410,77 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
     return sums;
   }, [character.traits.abilities, dictionaries.abilities]);
 
-  const canSetAttributeBase = (attr: AttributeDto, next: number) => {
+  const applyClampedDotChange = ({
+    current,
+    next,
+    maxAllowed,
+    path,
+    errorMessage,
+    mapValue = (value: number) => value
+  }: {
+    current: number;
+    next: number;
+    maxAllowed: number;
+    path: string;
+    errorMessage: string;
+    mapValue?: (value: number) => unknown;
+  }) => {
+    if (next === current) return;
+    if (next < current) {
+      onPatch(path, mapValue(next));
+      return;
+    }
+
+    const clampedNext = Math.min(next, maxAllowed);
+    if (clampedNext > current) {
+      onPatch(path, mapValue(clampedNext));
+      return;
+    }
+
+    pushToast(errorMessage, "error");
+  };
+
+  const getAttributeMaxBase = (attr: AttributeDto) => {
     const currentBase = character.traits.attributes[attr.key]?.base ?? 0;
-    if (next <= currentBase) return true;
     const rank = attrPriorities[attr.group];
-    if (!rank) return true;
-
-    const extras = { ...attributeExtras };
-    const minBase = minBaseForAttribute(attr.key);
-    const currentExtra = Math.max(0, currentBase - minBase);
-    const nextExtra = Math.max(0, next - minBase);
-    extras[attr.group] = extras[attr.group] - currentExtra + nextExtra;
-
-    const budget = ATTR_BUDGET[rank];
-    return extras[attr.group] <= budget;
+    if (!rank) return 5;
+    const remaining = Math.max(0, ATTR_BUDGET[rank] - attributeExtras[attr.group]);
+    return Math.min(5, currentBase + remaining);
   };
 
-  const canSetAbilityBase = (ability: AbilityDto, next: number) => {
+  const getAbilityMaxBase = (ability: AbilityDto) => {
     const currentBase = character.traits.abilities[ability.key]?.base ?? 0;
-    if (next <= currentBase) return true;
     const rank = abilPriorities[ability.group];
-    if (!rank) return true;
-
-    const sums = { ...abilitiesBase };
-    sums[ability.group] = sums[ability.group] - currentBase + next;
-    const budget = ABIL_BUDGET[rank];
-    return sums[ability.group] <= budget;
+    if (!rank) return 5;
+    const remaining = Math.max(0, ABIL_BUDGET[rank] - abilitiesBase[ability.group]);
+    return Math.min(5, currentBase + remaining);
   };
 
-  const canSetDisciplineBase = (key: string, next: number) => {
+  const getDisciplineMaxBase = (key: string) => {
     const currentBase = character.traits.disciplines[key]?.base ?? 0;
-    if (next <= currentBase) return true;
-    const currentSum = sumBase(character.traits.disciplines);
-    return currentSum - currentBase + next <= DISCIPLINE_BUDGET;
+    const remaining = Math.max(0, DISCIPLINE_BUDGET - sumBase(character.traits.disciplines));
+    return Math.min(3, currentBase + remaining);
   };
 
-  const canSetBackgroundBase = (key: string, next: number) => {
+  const getBackgroundMaxBase = (key: string) => {
     const currentBase = character.traits.backgrounds[key]?.base ?? 0;
-    if (next <= currentBase) return true;
-    const currentSum = sumBase(character.traits.backgrounds);
-    return currentSum - currentBase + next <= BACKGROUND_BUDGET;
+    const remaining = Math.max(0, BACKGROUND_BUDGET - sumBase(character.traits.backgrounds));
+    return Math.min(5, currentBase + remaining);
   };
 
-  const canSetVirtueBase = (key: string, next: number) => {
+  const getVirtueMaxBase = (key: string) => {
     const currentBase = character.traits.virtues[key]?.base ?? 1;
-    if (next <= currentBase) return true;
     const currentExtras = Object.values(character.traits.virtues).reduce(
       (sum, item) => sum + Math.max(0, (item?.base ?? 1) - 1),
       0
     );
-    const currentExtra = Math.max(0, currentBase - 1);
-    const nextExtra = Math.max(0, next - 1);
-    return currentExtras - currentExtra + nextExtra <= VIRTUE_EXTRA_BUDGET;
+    const remaining = Math.max(0, VIRTUE_EXTRA_BUDGET - currentExtras);
+    return Math.min(5, currentBase + remaining);
+  };
+
+  const getFreebieMaxTotal = (currentTotal: number, cost: number, maxTotal: number) => {
+    const affordableDots = Math.floor(Math.max(0, freebieState.remaining) / cost);
+    return Math.min(maxTotal, currentTotal + affordableDots);
   };
 
   const freebieState = useMemo(() => {
@@ -444,9 +546,9 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                 <p className="wizard-origin-field-note">
                   Это имя будет видно в листе, хронике и режиме ведущего.
                 </p>
-                <input
+                <BufferedTextInput
                   value={character.meta.name}
-                  onChange={(event) => onPatch("meta.name", event.target.value)}
+                  onCommit={(next) => onPatch("meta.name", next)}
                 />
                 {errorsFor("meta.name") && <small>{errorsFor("meta.name")}</small>}
               </div>
@@ -464,9 +566,9 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
               <div className="field wizard-origin-field">
                 <label>Сир (необязательно)</label>
                 <p className="wizard-origin-field-note">Наставник, создатель или важная фигура из прошлого.</p>
-                <input
+                <BufferedTextInput
                   value={character.meta.sire}
-                  onChange={(event) => onPatch("meta.sire", event.target.value)}
+                  onCommit={(next) => onPatch("meta.sire", next)}
                 />
               </div>
 
@@ -476,9 +578,9 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                   Короткая роль или архетип вроде “ночной адвокат”, “певица Элизиума” или
                   “уличный агитатор”.
                 </p>
-                <input
+                <BufferedTextInput
                   value={character.meta.concept}
-                  onChange={(event) => onPatch("meta.concept", event.target.value)}
+                  onCommit={(next) => onPatch("meta.concept", next)}
                 />
               </div>
             </div>
@@ -666,16 +768,16 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
               allowZero={false}
               disabled={isAppearance}
               onChange={(next) => {
-                if (!canSetAttributeBase(attr, next)) {
-                  if (budgetLabel != null) {
-                    pushToast(
-                      `Лимит группы "${groupLabels[attr.group]}" — ${budgetLabel} доп. точек`,
-                      "error"
-                    );
-                  }
-                  return;
-                }
-                onPatch(`traits.attributes.${attr.key}.base`, next);
+                applyClampedDotChange({
+                  current: value,
+                  next,
+                  maxAllowed: getAttributeMaxBase(attr),
+                  path: `traits.attributes.${attr.key}.base`,
+                  errorMessage:
+                    budgetLabel != null
+                      ? `Лимит группы "${groupLabels[attr.group]}" — ${budgetLabel} доп. точек`
+                      : "Лимит группы достигнут"
+                });
               }}
             />
           </div>
@@ -869,17 +971,18 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
               min={0}
               allowZero
               onChange={(next) => {
-                if (!canSetAbilityBase(ability, next)) {
-                  const rank = abilPriorities[ability.group];
-                  if (rank) {
-                    pushToast(
-                      `Лимит группы "${abilityGroupLabels[ability.group]}" — ${ABIL_BUDGET[rank]} точек`,
-                      "error"
-                    );
-                  }
-                  return;
-                }
-                onPatch(`traits.abilities.${ability.key}.base`, next);
+                const currentBase = layer?.base ?? 0;
+                const rank = abilPriorities[ability.group];
+                applyClampedDotChange({
+                  current: currentBase,
+                  next,
+                  maxAllowed: getAbilityMaxBase(ability),
+                  path: `traits.abilities.${ability.key}.base`,
+                  errorMessage:
+                    rank
+                      ? `Лимит группы "${abilityGroupLabels[ability.group]}" — ${ABIL_BUDGET[rank]} точек`
+                      : "Лимит группы достигнут"
+                });
               }}
             />
           </div>
@@ -1085,14 +1188,13 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                         max={3}
                         allowZero
                         onChange={(next) => {
-                          if (!canSetDisciplineBase(disc.key, next)) {
-                            pushToast(
-                              `Лимит дисциплин — ${DISCIPLINE_BUDGET} базовые точки`,
-                              "error"
-                            );
-                            return;
-                          }
-                          onPatch(`traits.disciplines.${disc.key}.base`, next);
+                          applyClampedDotChange({
+                            current: layer?.base ?? 0,
+                            next,
+                            maxAllowed: getDisciplineMaxBase(disc.key),
+                            path: `traits.disciplines.${disc.key}.base`,
+                            errorMessage: `Лимит дисциплин — ${DISCIPLINE_BUDGET} базовые точки`
+                          });
                         }}
                       />
                     </div>
@@ -1153,14 +1255,13 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                         min={0}
                         allowZero
                         onChange={(next) => {
-                          if (!canSetBackgroundBase(bg.key, next)) {
-                            pushToast(
-                              `Лимит фонов — ${BACKGROUND_BUDGET} базовых точек`,
-                              "error"
-                            );
-                            return;
-                          }
-                          onPatch(`traits.backgrounds.${bg.key}.base`, next);
+                          applyClampedDotChange({
+                            current: layer?.base ?? 0,
+                            next,
+                            maxAllowed: getBackgroundMaxBase(bg.key),
+                            path: `traits.backgrounds.${bg.key}.base`,
+                            errorMessage: `Лимит фонов — ${BACKGROUND_BUDGET} базовых точек`
+                          });
                         }}
                       />
                     </div>
@@ -1227,14 +1328,13 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                         value={layer?.base ?? 1}
                         min={1}
                         onChange={(next) => {
-                          if (!canSetVirtueBase(virtue.key, next)) {
-                            pushToast(
-                              `Лимит добродетелей — ${VIRTUE_EXTRA_BUDGET} доп. точек`,
-                              "error"
-                            );
-                            return;
-                          }
-                          onPatch(`traits.virtues.${virtue.key}.base`, next);
+                          applyClampedDotChange({
+                            current: layer?.base ?? 1,
+                            next,
+                            maxAllowed: getVirtueMaxBase(virtue.key),
+                            path: `traits.virtues.${virtue.key}.base`,
+                            errorMessage: `Лимит добродетелей — ${VIRTUE_EXTRA_BUDGET} доп. точек`
+                          });
                         }}
                       />
                     </div>
@@ -1452,11 +1552,15 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                         allowZero
                         disabled={isAppearance}
                         onChange={(next) =>
-                          onPatch(
-                              `traits.attributes.${attr.key}.freebie`,
-                              Math.max(0, next - safeBase)
-                            )
-                          }
+                          applyClampedDotChange({
+                            current: totalValue,
+                            next,
+                            maxAllowed: getFreebieMaxTotal(totalValue, FREEBIE_COST.attribute, 5),
+                            path: `traits.attributes.${attr.key}.freebie`,
+                            errorMessage: `Недостаточно свободных очков: осталось ${Math.max(0, freebieState.remaining)}`,
+                            mapValue: (clamped) => Math.max(0, clamped - safeBase)
+                          })
+                        }
                         />
                       </div>
                       {error && <small>{error}</small>}
@@ -1499,11 +1603,15 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                         baseValue={baseValue}
                         allowZero
                         onChange={(next) =>
-                          onPatch(
-                                `traits.disciplines.${disc.key}.freebie`,
-                                Math.max(0, next - baseValue)
-                              )
-                            }
+                          applyClampedDotChange({
+                            current: totalValue,
+                            next,
+                            maxAllowed: getFreebieMaxTotal(totalValue, FREEBIE_COST.discipline, 5),
+                            path: `traits.disciplines.${disc.key}.freebie`,
+                            errorMessage: `Недостаточно свободных очков: осталось ${Math.max(0, freebieState.remaining)}`,
+                            mapValue: (clamped) => Math.max(0, clamped - baseValue)
+                          })
+                        }
                           />
                         </div>
                         {error && <small>{error}</small>}
@@ -1544,11 +1652,15 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                             baseValue={baseValue}
                             allowZero
                             onChange={(next) =>
-                              onPatch(
-                              `traits.virtues.${virtue.key}.freebie`,
-                              Math.max(0, next - baseValue)
-                            )
-                          }
+                              applyClampedDotChange({
+                                current: totalValue,
+                                next,
+                                maxAllowed: getFreebieMaxTotal(totalValue, FREEBIE_COST.virtue, 5),
+                                path: `traits.virtues.${virtue.key}.freebie`,
+                                errorMessage: `Недостаточно свободных очков: осталось ${Math.max(0, freebieState.remaining)}`,
+                                mapValue: (clamped) => Math.max(0, clamped - baseValue)
+                              })
+                            }
                         />
                       </div>
                       {error && <small>{error}</small>}
@@ -1607,10 +1719,14 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                           baseValue={baseValue}
                           allowZero
                           onChange={(next) =>
-                            onPatch(
-                              `traits.abilities.${ability.key}.freebie`,
-                              Math.max(0, next - baseValue)
-                            )
+                            applyClampedDotChange({
+                              current: totalValue,
+                              next,
+                              maxAllowed: getFreebieMaxTotal(totalValue, FREEBIE_COST.ability, 5),
+                              path: `traits.abilities.${ability.key}.freebie`,
+                              errorMessage: `Недостаточно свободных очков: осталось ${Math.max(0, freebieState.remaining)}`,
+                              mapValue: (clamped) => Math.max(0, clamped - baseValue)
+                            })
                           }
                         />
                       </div>
@@ -1652,10 +1768,14 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                           baseValue={baseValue}
                           allowZero
                           onChange={(next) =>
-                            onPatch(
-                              `traits.backgrounds.${bg.key}.freebie`,
-                              Math.max(0, next - baseValue)
-                            )
+                            applyClampedDotChange({
+                              current: totalValue,
+                              next,
+                              maxAllowed: getFreebieMaxTotal(totalValue, FREEBIE_COST.background, 5),
+                              path: `traits.backgrounds.${bg.key}.freebie`,
+                              errorMessage: `Недостаточно свободных очков: осталось ${Math.max(0, freebieState.remaining)}`,
+                              mapValue: (clamped) => Math.max(0, clamped - baseValue)
+                            })
                           }
                         />
                       </div>
@@ -1696,10 +1816,14 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                           max={5}
                           allowZero
                           onChange={(next) =>
-                            onPatch(
-                              `traits.virtues.${virtue.key}.freebie`,
-                              Math.max(0, next - baseValue)
-                            )
+                            applyClampedDotChange({
+                              current: totalValue,
+                              next,
+                              maxAllowed: getFreebieMaxTotal(totalValue, FREEBIE_COST.virtue, 5),
+                              path: `traits.virtues.${virtue.key}.freebie`,
+                              errorMessage: `Недостаточно свободных очков: осталось ${Math.max(0, freebieState.remaining)}`,
+                              mapValue: (clamped) => Math.max(0, clamped - baseValue)
+                            })
                           }
                         />
                       </div>
@@ -1727,10 +1851,18 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                       baseValue={humanityBase}
                       allowZero
                       onChange={(next) =>
-                        onPatch(
-                          "creation.freebieBuys.humanity",
-                          Math.max(0, next - humanityBase)
-                        )
+                        applyClampedDotChange({
+                          current: humanityBase + humanityFreebie,
+                          next,
+                          maxAllowed: getFreebieMaxTotal(
+                            humanityBase + humanityFreebie,
+                            FREEBIE_COST.humanity,
+                            10
+                          ),
+                          path: "creation.freebieBuys.humanity",
+                          errorMessage: `Недостаточно свободных очков: осталось ${Math.max(0, freebieState.remaining)}`,
+                          mapValue: (clamped) => Math.max(0, clamped - humanityBase)
+                        })
                       }
                     />
                   </div>
@@ -1750,10 +1882,18 @@ export function Wizard({ character, onPatch, onStepChange, refresh }: WizardProp
                       baseValue={willpowerBase}
                       allowZero
                       onChange={(next) =>
-                        onPatch(
-                          "creation.freebieBuys.willpower",
-                          Math.max(0, next - willpowerBase)
-                        )
+                        applyClampedDotChange({
+                          current: willpowerBase + willpowerFreebie,
+                          next,
+                          maxAllowed: getFreebieMaxTotal(
+                            willpowerBase + willpowerFreebie,
+                            FREEBIE_COST.willpower,
+                            10
+                          ),
+                          path: "creation.freebieBuys.willpower",
+                          errorMessage: `Недостаточно свободных очков: осталось ${Math.max(0, freebieState.remaining)}`,
+                          mapValue: (clamped) => Math.max(0, clamped - willpowerBase)
+                        })
                       }
                     />
                   </div>

@@ -66,6 +66,23 @@ export default function Home() {
 
       <div className="card home-card">
         <div className="card-header">
+          <div className="section-title">Неигровые персонажи</div>
+        </div>
+        <div className="home-npc-cta">
+          <div>
+            <strong>Глобальный каталог NPC</strong>
+            <p className="home-subtitle">
+              Отдельный раздел для создания, просмотра и подготовки неигровых персонажей.
+            </p>
+          </div>
+          <Link to="/npcs" className="primary npc-link-button">
+            Открыть каталог
+          </Link>
+        </div>
+      </div>
+
+      <div className="card home-card">
+        <div className="card-header">
           <div className="section-title">Мои персонажи</div>
           <span className="tag">{characters.length}</span>
         </div>

@@ -6,6 +6,7 @@ import charactersRouter from "../../routes/characters";
 import chroniclesRouter from "../../routes/chronicles";
 import dictionariesRouter from "../../routes/dictionaries";
 import homeRouter from "../../routes/home";
+import npcsRouter from "../../routes/npcs";
 import {
   getValidationDictionaryCacheStats,
   getValidationMetricsSnapshot,
@@ -37,6 +38,7 @@ export function createApiRouter(authService: AuthService) {
   router.use(dictionariesRouter);
   router.use(homeRouter);
   router.use(chroniclesRouter);
+  router.use(npcsRouter);
   router.use(charactersRouter);
 
   router.use((req, res) => {

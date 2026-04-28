@@ -7,6 +7,9 @@ import Help from "../../pages/Help";
 import Home from "../../pages/Home";
 import LoginPage from "../../pages/LoginPage";
 import NotFound from "../../pages/NotFound";
+import NpcCatalogPage from "../../pages/NpcCatalogPage";
+import NpcDetailPage from "../../pages/NpcDetailPage";
+import NpcEditorPage from "../../pages/NpcEditorPage";
 import ProfilePage from "../../pages/ProfilePage";
 import StorytellerPage from "../../pages/StorytellerPage";
 import { ProtectedRoutes } from "./ProtectedRoutes";
@@ -19,6 +22,10 @@ export function AppRouter() {
         <Route path="/" element={<Home />} />
         <Route path="/chronicles/new" element={<CreateChronicle />} />
         <Route path="/help" element={<Help />} />
+        <Route path="/npcs" element={<NpcCatalogPage />} />
+        <Route path="/npcs/new" element={<NpcEditorPage />} />
+        <Route path="/npcs/:id" element={<NpcDetailPage />} />
+        <Route path="/npcs/:id/edit" element={<NpcEditorPage />} />
         <Route path="/chronicles/:id" element={<ChroniclePage />} />
         <Route path="/chronicles/:id/combat" element={<CombatPage />} />
         <Route path="/c/:uuid" element={<CharacterPage />} />

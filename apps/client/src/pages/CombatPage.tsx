@@ -1,14 +1,17 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type {
   CharacterSummaryDto,
   ChronicleDto,
-  CombatEnemyDto,
+  ChronicleNpcDto,
   CombatInitiativeDto,
+  CombatNpcDto,
   CombatStateDto,
   LayeredValue
 } from "../api/types";
+import { NpcPickerModal } from "../components/NpcPickerModal";
+import { useAuth } from "../context/AuthContext";
 import { useDictionaries } from "../context/DictionariesContext";
 import { useToast } from "../context/ToastContext";
 import { buildHealthTrack, woundPenalty } from "../utils/health";
@@ -30,9 +33,14 @@ type Participant =
       creationFinished: boolean;
     }
   | {
-      type: "enemy";
+      type: "npc";
       id: string;
+      npcId: string;
       name: string;
+      avatarUrl?: string;
+      clanLabel: string;
+      sectLabel: string;
+      generation?: number | null;
       dexterity: number;
       wits: number;
       woundMod: number;
@@ -61,7 +69,11 @@ function clampHealth(next: { bashing: number; lethal: number; aggravated: number
   };
 }
 
-function HealthTrackDisplay({ health }: { health: { bashing: number; lethal: number; aggravated: number } }) {
+function HealthTrackDisplay({
+  health
+}: {
+  health: { bashing: number; lethal: number; aggravated: number };
+}) {
   const track = buildHealthTrack(health);
   return (
     <div className="health-track readonly">
@@ -76,17 +88,25 @@ function HealthTrackDisplay({ health }: { health: { bashing: number; lethal: num
 
 export default function CombatPage() {
   const { id } = useParams();
+  const { user } = useAuth();
   const { pushToast } = useToast();
   const { dictionaries } = useDictionaries();
   const [chronicle, setChronicle] = useState<ChronicleDto | null>(null);
   const [characters, setCharacters] = useState<CharacterSummaryDto[]>([]);
   const [combat, setCombat] = useState<CombatStateDto | null>(null);
   const [loading, setLoading] = useState(true);
-  const [enemyName, setEnemyName] = useState("");
-  const [enemyDex, setEnemyDex] = useState(0);
-  const [enemyWits, setEnemyWits] = useState(0);
+  const [npcModalOpen, setNpcModalOpen] = useState(false);
+  const [chronicleNpcs, setChronicleNpcs] = useState<ChronicleNpcDto[]>([]);
+  const [npcSearch, setNpcSearch] = useState("");
+  const deferredNpcSearch = useDeferredValue(npcSearch);
+  const [npcLoading, setNpcLoading] = useState(false);
+  const [busyNpcId, setBusyNpcId] = useState<string | null>(null);
 
-  const logCombatEvent = async (payload: { type: string; message: string; data?: Record<string, unknown> }) => {
+  const logCombatEvent = async (payload: {
+    type: string;
+    message: string;
+    data?: Record<string, unknown>;
+  }) => {
     if (!id) return;
     try {
       await api.post(`/chronicles/${id}/logs`, payload);
@@ -115,7 +135,7 @@ export default function CombatPage() {
         if (active) setLoading(false);
       }
     }
-    load();
+    void load();
     return () => {
       active = false;
     };
@@ -139,11 +159,49 @@ export default function CombatPage() {
     };
   }, [id]);
 
+  const isChronicleAuthor =
+    chronicle && user ? String(chronicle.createdByUserId ?? "") === user.id : false;
+
+  useEffect(() => {
+    if (!id || !isChronicleAuthor || !npcModalOpen) {
+      setChronicleNpcs([]);
+      setNpcLoading(false);
+      return;
+    }
+
+    let active = true;
+
+    async function loadChronicleNpcs() {
+      setNpcLoading(true);
+      try {
+        const query = deferredNpcSearch.trim();
+        const path = query
+          ? `/chronicles/${id}/npcs?search=${encodeURIComponent(query)}`
+          : `/chronicles/${id}/npcs`;
+        const data = await api.get<ChronicleNpcDto[]>(path);
+        if (!active) return;
+        setChronicleNpcs(data);
+      } catch (err: any) {
+        if (!active) return;
+        pushToast(err?.message ?? "Не удалось загрузить NPC хроники", "error");
+      } finally {
+        if (active) {
+          setNpcLoading(false);
+        }
+      }
+    }
+
+    void loadChronicleNpcs();
+    return () => {
+      active = false;
+    };
+  }, [deferredNpcSearch, id, isChronicleAuthor, npcModalOpen, pushToast]);
+
   const participants = useMemo<Participant[]>(() => {
     if (!combat?.active) {
       return [];
     }
-    const initiatives = combat?.initiatives ?? {};
+    const initiatives = combat.initiatives ?? {};
     const characterEntries: Participant[] = characters
       .filter((character) => character.creationFinished)
       .map((character) => {
@@ -167,29 +225,35 @@ export default function CombatPage() {
           dexterity,
           wits,
           woundMod,
-          initiative: initiatives?.[character.uuid],
+          initiative: initiatives[character.uuid],
           creationFinished: character.creationFinished
         };
       });
-    const enemyEntries: Participant[] =
-      combat?.enemies?.map((enemy) => {
-        const health = enemy.health ?? { bashing: 0, lethal: 0, aggravated: 0 };
-        const woundMod = woundPenalty(health.bashing + health.lethal + health.aggravated);
-        return {
-          type: "enemy",
-          id: enemy._id,
-          name: enemy.name,
-          dexterity: enemy.dexterity ?? 0,
-          wits: enemy.wits ?? 0,
-          health,
-          woundMod,
-          initiative: enemy.initiative,
-          dead: enemy.dead ?? false
-        };
-      }) ?? [];
 
-    const all = [...characterEntries, ...enemyEntries];
-    return all.sort((a, b) => {
+    const npcEntries: Participant[] = combat.npcs.map((npc) => {
+      const health = npc.health ?? { bashing: 0, lethal: 0, aggravated: 0 };
+      const woundMod = woundPenalty(health.bashing + health.lethal + health.aggravated);
+      return {
+        type: "npc",
+        id: npc._id,
+        npcId: npc.npcId,
+        name: npc.displayName,
+        avatarUrl: npc.avatarUrl,
+        clanLabel:
+          dictionaries.clans.find((item) => item.key === npc.clanKey)?.labelRu || "",
+        sectLabel:
+          dictionaries.sects.find((item) => item.key === npc.sectKey)?.labelRu || "",
+        generation: npc.generation ?? null,
+        dexterity: npc.dexterity ?? 0,
+        wits: npc.wits ?? 0,
+        health,
+        woundMod,
+        initiative: npc.initiative,
+        dead: npc.dead ?? false
+      };
+    });
+
+    return [...characterEntries, ...npcEntries].sort((a, b) => {
       const aInit = a.initiative?.total ?? -Infinity;
       const bInit = b.initiative?.total ?? -Infinity;
       if (aInit !== bInit) return bInit - aInit;
@@ -202,7 +266,11 @@ export default function CombatPage() {
 
   const isActive = combat?.active ?? false;
 
-  const rollInitiative = (dexterity: number, wits: number, woundMod = 0): CombatInitiativeDto => {
+  const rollInitiative = (
+    dexterity: number,
+    wits: number,
+    woundMod = 0
+  ): CombatInitiativeDto => {
     const base = dexterity + wits;
     const roll = 1 + Math.floor(Math.random() * 10);
     return {
@@ -226,7 +294,10 @@ export default function CombatPage() {
         prev
           ? {
               ...prev,
-              initiatives: { ...(prev.initiatives ?? {}), [result.characterUuid]: result.initiative }
+              initiatives: {
+                ...(prev.initiatives ?? {}),
+                [result.characterUuid]: result.initiative
+              }
             }
           : prev
       );
@@ -235,137 +306,113 @@ export default function CombatPage() {
     }
   };
 
-  const handleEnemyInitiative = async (
-    enemyId: string,
-    enemyName: string,
-    dexterity: number,
-    wits: number,
-    woundMod = 0
-  ) => {
+  const updateNpcInCombat = (updated: CombatNpcDto) => {
+    setCombat((prev) =>
+      prev
+        ? {
+            ...prev,
+            npcs: prev.npcs.map((item) => (item._id === updated._id ? updated : item))
+          }
+        : prev
+    );
+  };
+
+  const handleNpcInitiative = async (participant: Extract<Participant, { type: "npc" }>) => {
     if (!id) return;
-    const initiative = rollInitiative(dexterity ?? 0, wits ?? 0, woundMod);
+    const initiative = rollInitiative(participant.dexterity, participant.wits, participant.woundMod);
     try {
-      const updated = await api.patch<CombatEnemyDto>(
-        `/chronicles/${id}/combat/enemies/${enemyId}`,
+      const updated = await api.patch<CombatNpcDto>(
+        `/chronicles/${id}/combat/npcs/${participant.id}`,
         { initiative }
       );
-      setCombat((prev) =>
-        prev
-          ? {
-              ...prev,
-              enemies: prev.enemies.map((item) => (item._id === updated._id ? updated : item))
-            }
-          : prev
-      );
-      logCombatEvent({
-        type: "combat_enemy_initiative",
-        message: `Враг ${enemyName}, бросил инициативу: Ловкость ${initiative.dexterity} + Смекалка ${initiative.wits} + d10(${initiative.roll})${woundMod ? ` + штраф ранений ${woundMod}` : ""} = ${initiative.total}.`,
-        data: { enemyId, enemyName, initiative, woundMod }
+      updateNpcInCombat(updated);
+      void logCombatEvent({
+        type: "combat_npc_initiative",
+        message: `NPC ${participant.name} бросил инициативу: Ловкость ${initiative.dexterity} + Смекалка ${initiative.wits} + d10(${initiative.roll})${participant.woundMod ? ` + штраф ранений ${participant.woundMod}` : ""} = ${initiative.total}.`,
+        data: { combatNpcId: participant.id, npcId: participant.npcId, initiative }
       });
     } catch (err: any) {
       pushToast(err?.message ?? "Не удалось бросить инициативу", "error");
     }
   };
 
-  const handleEnemyHealth = async (
-    enemyId: string,
-    enemyName: string,
-    current: { bashing: number; lethal: number; aggravated: number },
+  const handleNpcHealth = async (
+    participant: Extract<Participant, { type: "npc" }>,
     field: "bashing" | "lethal" | "aggravated",
     delta: number
   ) => {
     if (!id) return;
     const next = clampHealth({
-      ...current,
-      [field]: (current?.[field] ?? 0) + delta
+      ...participant.health,
+      [field]: (participant.health?.[field] ?? 0) + delta
     });
     try {
-      const updated = await api.patch<CombatEnemyDto>(
-        `/chronicles/${id}/combat/enemies/${enemyId}`,
+      const updated = await api.patch<CombatNpcDto>(
+        `/chronicles/${id}/combat/npcs/${participant.id}`,
         { health: next }
       );
-      setCombat((prev) =>
-        prev
-          ? {
-              ...prev,
-              enemies: prev.enemies.map((item) => (item._id === updated._id ? updated : item))
-            }
-          : prev
-      );
-      const deltas = {
-        bashing: next.bashing - current.bashing,
-        lethal: next.lethal - current.lethal,
-        aggravated: next.aggravated - current.aggravated
-      };
-      const typeLabels: Record<string, string> = {
-        bashing: "ударный",
-        lethal: "летальный",
-        aggravated: "агравированный"
-      };
-      (Object.keys(deltas) as Array<keyof typeof deltas>).forEach((key) => {
-        const change = deltas[key];
-        if (change === 0) return;
-        const kind = change > 0 ? "damage" : "heal";
-        const amount = Math.abs(change);
-        const typeLabel = typeLabels[key] ?? key;
-        const actionLabel = kind === "damage" ? "получил урон" : "вылечил урон";
-        logCombatEvent({
-          type: kind === "damage" ? "combat_enemy_damage" : "combat_enemy_heal",
-          message: `Враг ${enemyName} ${actionLabel} типа ${typeLabel}: ${amount}.`,
-          data: { enemyId, enemyName, kind, damageType: key, amount }
+      updateNpcInCombat(updated);
+      const amount = Math.abs(next[field] - participant.health[field]);
+      if (amount > 0) {
+        const kind = next[field] > participant.health[field] ? "damage" : "heal";
+        void logCombatEvent({
+          type: kind === "damage" ? "combat_npc_damage" : "combat_npc_heal",
+          message: `NPC ${participant.name} ${kind === "damage" ? "получил урон" : "вылечил урон"}: ${amount}.`,
+          data: { combatNpcId: participant.id, npcId: participant.npcId, field, amount, kind }
         });
-      });
+      }
     } catch (err: any) {
-      pushToast(err?.message ?? "Не удалось обновить урон", "error");
+      pushToast(err?.message ?? "Не удалось обновить здоровье NPC", "error");
     }
   };
 
-  const toggleEnemyDead = async (enemyId: string, enemyName: string, dead: boolean) => {
+  const toggleNpcDead = async (participant: Extract<Participant, { type: "npc" }>) => {
     if (!id) return;
     try {
-      const updated = await api.patch<CombatEnemyDto>(
-        `/chronicles/${id}/combat/enemies/${enemyId}`,
-        { dead: !dead }
+      const updated = await api.patch<CombatNpcDto>(
+        `/chronicles/${id}/combat/npcs/${participant.id}`,
+        { dead: !participant.dead }
       );
-      setCombat((prev) =>
-        prev
-          ? {
-              ...prev,
-              enemies: prev.enemies.map((item) => (item._id === updated._id ? updated : item))
-            }
-          : prev
-      );
-      logCombatEvent({
-        type: "combat_enemy_status",
-        message: `Враг ${enemyName} ${updated.dead ? "погиб" : "воскрес"}.`,
-        data: { enemyId, enemyName, dead: updated.dead }
+      updateNpcInCombat(updated);
+      void logCombatEvent({
+        type: "combat_npc_status",
+        message: `NPC ${participant.name} ${updated.dead ? "погиб" : "вернулся в строй"}.`,
+        data: { combatNpcId: participant.id, npcId: participant.npcId, dead: updated.dead }
       });
     } catch (err: any) {
-      pushToast(err?.message ?? "Не удалось обновить статус", "error");
+      pushToast(err?.message ?? "Не удалось обновить статус NPC", "error");
     }
   };
 
-  const handleAddEnemy = async () => {
+  const handleAddNpc = async (npcId: string) => {
     if (!id) return;
-    const name = enemyName.trim();
-    if (!name) {
-      pushToast("Имя противника обязательно", "error");
-      return;
-    }
+    setBusyNpcId(npcId);
     try {
-      const enemy = await api.post<CombatEnemyDto>(`/chronicles/${id}/combat/enemies`, {
-        name,
-        dexterity: enemyDex,
-        wits: enemyWits
-      });
-      setCombat((prev) =>
-        prev ? { ...prev, enemies: [enemy, ...(prev.enemies ?? [])] } : prev
-      );
-      setEnemyName("");
-      setEnemyDex(0);
-      setEnemyWits(0);
+      const created = await api.post<CombatNpcDto>(`/chronicles/${id}/combat/npcs`, { npcId });
+      setCombat((prev) => (prev ? { ...prev, npcs: [...prev.npcs, created] } : prev));
+      setNpcSearch("");
+      setNpcModalOpen(false);
+      pushToast("NPC добавлен в бой", "success");
     } catch (err: any) {
-      pushToast(err?.message ?? "Не удалось добавить противника", "error");
+      pushToast(err?.message ?? "Не удалось добавить NPC в бой", "error");
+    } finally {
+      setBusyNpcId(null);
+    }
+  };
+
+  const handleRemoveNpc = async (combatNpcId: string) => {
+    if (!id) return;
+    setBusyNpcId(combatNpcId);
+    try {
+      await api.del(`/chronicles/${id}/combat/npcs/${combatNpcId}`);
+      setCombat((prev) =>
+        prev ? { ...prev, npcs: prev.npcs.filter((item) => item._id !== combatNpcId) } : prev
+      );
+      pushToast("NPC убран из боя", "success");
+    } catch (err: any) {
+      pushToast(err?.message ?? "Не удалось убрать NPC из боя", "error");
+    } finally {
+      setBusyNpcId(null);
     }
   };
 
@@ -374,7 +421,7 @@ export default function CombatPage() {
     try {
       await api.del(`/chronicles/${id}/combat`);
       setCombat((prev) =>
-        prev ? { ...prev, initiatives: {}, enemies: [], active: false } : prev
+        prev ? { ...prev, initiatives: {}, npcs: [], active: false } : prev
       );
       pushToast("Бой завершён", "success");
     } catch (err: any) {
@@ -450,279 +497,233 @@ export default function CombatPage() {
 
       {isActive && (
         <>
-      <div className="card">
-        <div className="section-title">Добавить противника</div>
-        <div className="combat-add">
-          <label className="field">
-            <span>Имя</span>
-            <input value={enemyName} onChange={(event) => setEnemyName(event.target.value)} />
-          </label>
-          <label className="field">
-            <span>Ловкость</span>
-            <input
-              type="number"
-              min={0}
-              max={10}
-              value={enemyDex}
-              onChange={(event) => setEnemyDex(Number(event.target.value))}
-            />
-          </label>
-          <label className="field">
-            <span>Смекалка</span>
-            <input
-              type="number"
-              min={0}
-              max={10}
-              value={enemyWits}
-              onChange={(event) => setEnemyWits(Number(event.target.value))}
-            />
-          </label>
-          <button type="button" className="primary" onClick={handleAddEnemy}>
-            Добавить
-          </button>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="section-title">Инициатива и здоровье</div>
-        <div className="combat-list">
-          {participants.map((participant) => {
-            const isEnemy = participant.type === "enemy";
-            const isDead = participant.type === "enemy" ? participant.dead : false;
-            const initiative = participant.initiative;
-            const initiativeLabel = initiative ? initiative.total : "—";
-            const woundLabel = participant.woundMod ? ` + штраф ранений ${participant.woundMod}` : "";
-            const initiativeMeta = initiative
-              ? `${initiative.base} + d10(${initiative.roll})${woundLabel}`
-              : `Ловкость + Смекалка${woundLabel}`;
-
-            const avatarLetter =
-              participant.name && participant.name !== "(Без имени)"
-                ? participant.name.trim().charAt(0).toUpperCase()
-                : "—";
-
-            return (
-              <div
-                key={`${participant.type}-${participant.id}`}
-                className={`combat-entry ${isEnemy ? "enemy" : "character"} ${
-                  isDead ? "dead" : ""
-                }`}
-              >
-                <div className="combat-entry-main">
-                  {participant.type === "character" ? (
-                    <Link to={`/c/${participant.id}`} className="combat-link">
-                      {participant.avatarUrl ? (
-                        <img
-                          className="combat-avatar"
-                          src={participant.avatarUrl}
-                          alt={participant.name}
-                        />
-                      ) : (
-                        <span className="combat-avatar placeholder">{avatarLetter}</span>
-                      )}
-                    </Link>
-                  ) : (
-                    <span className="combat-avatar placeholder">⚔️</span>
-                  )}
-                  <div className="combat-entry-title">
-                    <div className="combat-entry-name">
-                      {participant.type === "character" ? (
-                        <Link to={`/c/${participant.id}`} className="combat-link">
-                          {participant.name}
-                        </Link>
-                      ) : (
-                        participant.name
-                      )}
-                      {participant.type === "character" && !participant.creationFinished && (
-                        <span className="tag">Черновик ✦</span>
-                      )}
-                      {participant.type === "enemy" && (
-                        <span className="tag">Враг</span>
-                      )}
-                      {participant.type === "enemy" && participant.dead && (
-                        <span className="tag">Погиб</span>
-                      )}
-                    </div>
-                    {participant.type === "character" ? (
-                      <div className="combat-entry-sub">
-                        Игрок: {participant.playerName} · Клан: {participant.clanLabel}
-                        {participant.generation ? ` · Поколение ${participant.generation}` : ""}
-                      </div>
-                    ) : (
-                      <div className="combat-entry-sub">Ловк {participant.dexterity} · Смек {participant.wits}</div>
-                    )}
+          {isChronicleAuthor && (
+            <div className="card">
+              <div className="card-header">
+                <div className="card-header-main">
+                  <div className="section-title">NPC в бою</div>
+                  <div className="st-meta">
+                    <span>Только привязанные к хронике NPC</span>
+                    <span>Каждое добавление создаёт snapshot-копию</span>
                   </div>
                 </div>
-                <div className="combat-entry-actions">
-                  <div className="combat-initiative">
-                    <div className="combat-initiative-value">{initiativeLabel}</div>
-                    <div className="combat-initiative-meta">{initiativeMeta}</div>
-                    {participant.type === "character" ? (
-                      <button
-                        type="button"
-                        className="icon-button initiative-roll-button"
-                        onClick={() => handleCharacterInitiative(participant)}
-                        title="Бросить"
-                        aria-label="Бросить"
-                      >
-                        ⚡
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="icon-button initiative-roll-button"
-                        onClick={() =>
-                          handleEnemyInitiative(
-                            participant.id,
-                            participant.name,
-                            participant.dexterity,
-                            participant.wits,
-                            participant.woundMod
-                          )
-                        }
-                        title="Бросить"
-                        aria-label="Бросить"
-                      >
-                        ⚡
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="combat-health">
-                    {participant.type === "character" ? (
-                      <HealthTrackDisplay health={participant.health} />
-                    ) : (
-                      <div className="combat-enemy-health">
-                        <HealthTrackDisplay health={participant.health} />
-                        <div className="combat-enemy-actions">
-                          <button
-                            type="button"
-                            className="health-action-mini"
-                            onClick={() =>
-                              handleEnemyHealth(
-                                participant.id,
-                                participant.name,
-                                participant.health,
-                                "bashing",
-                                1
-                              )
-                            }
-                          >
-                            +👊
-                          </button>
-                          <button
-                            type="button"
-                            className="health-action-mini"
-                            onClick={() =>
-                              handleEnemyHealth(
-                                participant.id,
-                                participant.name,
-                                participant.health,
-                                "bashing",
-                                -1
-                              )
-                            }
-                          >
-                            -👊
-                          </button>
-                          <button
-                            type="button"
-                            className="health-action-mini"
-                            onClick={() =>
-                              handleEnemyHealth(
-                                participant.id,
-                                participant.name,
-                                participant.health,
-                                "lethal",
-                                1
-                              )
-                            }
-                          >
-                            +🔪
-                          </button>
-                          <button
-                            type="button"
-                            className="health-action-mini"
-                            onClick={() =>
-                              handleEnemyHealth(
-                                participant.id,
-                                participant.name,
-                                participant.health,
-                                "lethal",
-                                -1
-                              )
-                            }
-                          >
-                            -🔪
-                          </button>
-                          <button
-                            type="button"
-                            className="health-action-mini"
-                            onClick={() =>
-                              handleEnemyHealth(
-                                participant.id,
-                                participant.name,
-                                participant.health,
-                                "aggravated",
-                                1
-                              )
-                            }
-                          >
-                            +🐾
-                          </button>
-                          <button
-                            type="button"
-                            className="health-action-mini"
-                            onClick={() =>
-                              handleEnemyHealth(
-                                participant.id,
-                                participant.name,
-                                participant.health,
-                                "aggravated",
-                                -1
-                              )
-                            }
-                          >
-                            -🐾
-                          </button>
-                          <button
-                            type="button"
-                            className="health-action-mini danger"
-                            onClick={() =>
-                              toggleEnemyDead(participant.id, participant.name, participant.dead)
-                            }
-                          >
-                            {participant.dead ? "Вернуть" : "Погиб"}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                <div className="page-actions">
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={() => {
+                      setNpcSearch("");
+                      setNpcModalOpen(true);
+                    }}
+                  >
+                    Добавить NPC в бой
+                  </button>
                 </div>
               </div>
-            );
-          })}
-          {participants.length === 0 && <div className="combat-empty">Пока нет участников.</div>}
-        </div>
-      </div>
+            </div>
+          )}
+
+          <div className="card">
+            <div className="section-title">Инициатива и здоровье</div>
+            <div className="combat-list">
+              {participants.map((participant) => {
+                const isNpc = participant.type === "npc";
+                const isDead = participant.type === "npc" ? participant.dead : false;
+                const initiative = participant.initiative;
+                const initiativeLabel = initiative ? initiative.total : "—";
+                const woundLabel = participant.woundMod
+                  ? ` + штраф ранений ${participant.woundMod}`
+                  : "";
+                const initiativeMeta = initiative
+                  ? `${initiative.base} + d10(${initiative.roll})${woundLabel}`
+                  : `Ловкость + Смекалка${woundLabel}`;
+
+                const avatarLetter =
+                  participant.name && participant.name !== "(Без имени)"
+                    ? participant.name.trim().charAt(0).toUpperCase()
+                    : "—";
+
+                const npcMeta =
+                  participant.type === "npc"
+                    ? [participant.clanLabel, participant.sectLabel, participant.generation ? `Поколение ${participant.generation}` : ""]
+                        .filter(Boolean)
+                        .join(" · ")
+                    : "";
+
+                return (
+                  <div
+                    key={`${participant.type}-${participant.id}`}
+                    className={`combat-entry ${isNpc ? "enemy" : "character"} ${isDead ? "dead" : ""}`}
+                  >
+                    <div className="combat-entry-main">
+                      {participant.type === "character" ? (
+                        <Link to={`/c/${participant.id}`} className="combat-link">
+                          {participant.avatarUrl ? (
+                            <img className="combat-avatar" src={participant.avatarUrl} alt={participant.name} />
+                          ) : (
+                            <span className="combat-avatar placeholder">{avatarLetter}</span>
+                          )}
+                        </Link>
+                      ) : participant.avatarUrl ? (
+                        <Link to={`/npcs/${participant.npcId}`} className="combat-link">
+                          <img className="combat-avatar" src={participant.avatarUrl} alt={participant.name} />
+                        </Link>
+                      ) : (
+                        <Link to={`/npcs/${participant.npcId}`} className="combat-link">
+                          <span className="combat-avatar placeholder">{avatarLetter}</span>
+                        </Link>
+                      )}
+                      <div className="combat-entry-title">
+                        <div className="combat-entry-name">
+                          {participant.type === "character" ? (
+                            <Link to={`/c/${participant.id}`} className="combat-link">
+                              {participant.name}
+                            </Link>
+                          ) : (
+                            <Link to={`/npcs/${participant.npcId}`} className="combat-link">
+                              {participant.name}
+                            </Link>
+                          )}
+                          {participant.type === "character" && !participant.creationFinished && (
+                            <span className="tag">Черновик ✦</span>
+                          )}
+                          {participant.type === "npc" && <span className="tag">NPC</span>}
+                          {participant.type === "npc" && participant.dead && (
+                            <span className="tag">Погиб</span>
+                          )}
+                        </div>
+                        {participant.type === "character" ? (
+                          <div className="combat-entry-sub">
+                            Игрок: {participant.playerName} · Клан: {participant.clanLabel}
+                            {participant.generation ? ` · Поколение ${participant.generation}` : ""}
+                          </div>
+                        ) : (
+                          <div className="combat-entry-sub">
+                            {npcMeta || "Без клана и секты"} · Ловк {participant.dexterity} · Смек {participant.wits}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="combat-entry-actions">
+                      <div className="combat-initiative">
+                        <div className="combat-initiative-value">{initiativeLabel}</div>
+                        <div className="combat-initiative-meta">{initiativeMeta}</div>
+                        {participant.type === "character" ? (
+                          <button
+                            type="button"
+                            className="icon-button initiative-roll-button"
+                            onClick={() => handleCharacterInitiative(participant)}
+                            title="Бросить"
+                            aria-label="Бросить"
+                          >
+                            ⚡
+                          </button>
+                        ) : isChronicleAuthor ? (
+                          <button
+                            type="button"
+                            className="icon-button initiative-roll-button"
+                            onClick={() => handleNpcInitiative(participant)}
+                            title="Бросить"
+                            aria-label="Бросить"
+                          >
+                            ⚡
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <div className="combat-health">
+                        {participant.type === "character" ? (
+                          <HealthTrackDisplay health={participant.health} />
+                        ) : isChronicleAuthor ? (
+                          <div className="combat-enemy-health">
+                            <HealthTrackDisplay health={participant.health} />
+                            <div className="combat-enemy-actions">
+                              <button
+                                type="button"
+                                className="health-action-mini"
+                                onClick={() => handleNpcHealth(participant, "bashing", 1)}
+                              >
+                                +👊
+                              </button>
+                              <button
+                                type="button"
+                                className="health-action-mini"
+                                onClick={() => handleNpcHealth(participant, "bashing", -1)}
+                              >
+                                -👊
+                              </button>
+                              <button
+                                type="button"
+                                className="health-action-mini"
+                                onClick={() => handleNpcHealth(participant, "lethal", 1)}
+                              >
+                                +🔪
+                              </button>
+                              <button
+                                type="button"
+                                className="health-action-mini"
+                                onClick={() => handleNpcHealth(participant, "lethal", -1)}
+                              >
+                                -🔪
+                              </button>
+                              <button
+                                type="button"
+                                className="health-action-mini"
+                                onClick={() => handleNpcHealth(participant, "aggravated", 1)}
+                              >
+                                +🐾
+                              </button>
+                              <button
+                                type="button"
+                                className="health-action-mini"
+                                onClick={() => handleNpcHealth(participant, "aggravated", -1)}
+                              >
+                                -🐾
+                              </button>
+                              <button
+                                type="button"
+                                className="health-action-mini danger"
+                                onClick={() => toggleNpcDead(participant)}
+                              >
+                                {participant.dead ? "Вернуть" : "Погиб"}
+                              </button>
+                              <button
+                                type="button"
+                                className="health-action-mini"
+                                disabled={busyNpcId === participant.id}
+                                onClick={() => handleRemoveNpc(participant.id)}
+                              >
+                                Убрать
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <HealthTrackDisplay health={participant.health} />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {participants.length === 0 && <div className="combat-empty">Пока нет участников.</div>}
+            </div>
+          </div>
         </>
       )}
+
+      <NpcPickerModal
+        open={npcModalOpen}
+        title="Добавить NPC в бой"
+        search={npcSearch}
+        loading={npcLoading}
+        items={chronicleNpcs}
+        emptyState="Нет NPC, привязанных к этой хронике."
+        actionLabel="Добавить"
+        busyNpcId={busyNpcId}
+        onClose={() => setNpcModalOpen(false)}
+        onSearchChange={setNpcSearch}
+        onPick={handleAddNpc}
+      />
     </section>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

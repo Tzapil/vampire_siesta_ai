@@ -127,7 +127,7 @@
 - Реализация сидирования: `apps/server/src/seed.ts`.
 - Источник данных: `data/*.json`.
 - Seed заполняет clans, disciplines, attributes, abilities, backgrounds, merits, flaws, natures, demeanors, virtues, sects и generations.
-- Seed также гарантирует наличие дефолтной хроники.
+- Seed больше не создаёт дефолтную хронику `Без хроники`; если приложению нужна такая хроника, она создаётся отдельным runtime-flow.
 - `virtues` и `sects` больше не зашиты inline в `seed.ts`; их source of truth — `data/virtues.json` и `data/sects.json`.
 - `natures` и `demeanors` продолжают сидироваться из `data/archetypes.json`; если нужно поправить их описания, менять именно этот файл.
 - `syncByKey()` в `seed.ts` делает `deleteMany({ key: { $nin: keys } })` + `updateOne(..., { upsert: true })`, поэтому повторный `npm run seed` обновляет тексты и состав словарей в MongoDB без ручной чистки базы.

@@ -118,6 +118,9 @@ export default function StorytellerPage() {
 
   const { sendPatch } = useCharacterSocket(uuid, {
     currentVersion: character?.version,
+    onPatchConfirmed: (payload) => {
+      setCharacter((prev) => (prev ? { ...prev, version: payload.version } : prev));
+    },
     onPatchApplied: (payload) => {
       setCharacter((prev) => {
         if (!prev) return prev;

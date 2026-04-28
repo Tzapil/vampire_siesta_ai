@@ -267,7 +267,7 @@ export function registerSocket(io: Server, authService: AuthService) {
             reason: rollback ? "rollback" : "server-change"
           });
         } else {
-          io.to(patch.characterUuid).emit("patchApplied", {
+          socket.to(patch.characterUuid).emit("patchApplied", {
             characterUuid: patch.characterUuid,
             path: patch.path,
             value: patch.value,

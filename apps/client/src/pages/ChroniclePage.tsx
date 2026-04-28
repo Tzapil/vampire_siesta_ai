@@ -1,27 +1,54 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type {
   CharacterDto,
+  CharacterSummaryDto,
   ChronicleDto,
   ChronicleImageDto,
   ChronicleLogDto,
-  CharacterSummaryDto,
-  CombatStateDto
+  ChronicleNpcDto,
+  CombatStateDto,
+  NpcSummaryDto
 } from "../api/types";
+import { NpcPickerModal } from "../components/NpcPickerModal";
+import { useAuth } from "../context/AuthContext";
 import { useDictionaries } from "../context/DictionariesContext";
 import { useToast } from "../context/ToastContext";
+import { getNpcFallbackLetter, getNpcMetaSubtitle } from "../utils/npc";
+
+function sortByName<T>(items: T[], getName: (item: T) => string | undefined) {
+  return [...items].sort((a, b) => {
+    const nameA = (getName(a) ?? "").trim();
+    const nameB = (getName(b) ?? "").trim();
+    if (!nameA && !nameB) return 0;
+    if (!nameA) return 1;
+    if (!nameB) return -1;
+    return nameA.localeCompare(nameB, "ru");
+  });
+}
 
 export default function ChroniclePage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [chronicle, setChronicle] = useState<ChronicleDto | null>(null);
   const [characters, setCharacters] = useState<CharacterSummaryDto[]>([]);
   const [logs, setLogs] = useState<ChronicleLogDto[]>([]);
   const [images, setImages] = useState<ChronicleImageDto[]>([]);
   const [selectedImage, setSelectedImage] = useState<ChronicleImageDto | null>(null);
   const [combat, setCombat] = useState<CombatStateDto | null>(null);
+  const [chronicleNpcs, setChronicleNpcs] = useState<ChronicleNpcDto[]>([]);
+  const [availableNpcs, setAvailableNpcs] = useState<NpcSummaryDto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [npcLoading, setNpcLoading] = useState(false);
+  const [availableNpcLoading, setAvailableNpcLoading] = useState(false);
+  const [npcSearch, setNpcSearch] = useState("");
+  const [availableNpcSearch, setAvailableNpcSearch] = useState("");
+  const [npcModalOpen, setNpcModalOpen] = useState(false);
+  const [busyNpcId, setBusyNpcId] = useState<string | null>(null);
+  const deferredNpcSearch = useDeferredValue(npcSearch);
+  const deferredAvailableNpcSearch = useDeferredValue(availableNpcSearch);
   const { pushToast } = useToast();
   const { dictionaries } = useDictionaries();
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -42,14 +69,16 @@ export default function ChroniclePage() {
         if (!active) return;
         setChronicle(chronicleData);
         setCharacters(charactersData);
-        const sortedLogs = [...logsData].sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        setLogs(
+          [...logsData].sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
         );
-        setLogs(sortedLogs);
-        const sortedImages = [...imagesData].sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        setImages(
+          [...imagesData].sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
         );
-        setImages(sortedImages);
         setCombat(combatData);
       } catch (err: any) {
         pushToast(err?.message ?? "Не удалось загрузить хронику", "error");
@@ -57,29 +86,84 @@ export default function ChroniclePage() {
         if (active) setLoading(false);
       }
     }
-    load();
+    void load();
     return () => {
       active = false;
     };
   }, [id, pushToast]);
 
-  if (loading) {
-    return (
-      <section className="page">
-        <h1>Хроника</h1>
-        <p>Загрузка…</p>
-      </section>
-    );
-  }
+  const isChronicleAuthor =
+    chronicle && user ? String(chronicle.createdByUserId ?? "") === user.id : false;
 
-  if (!chronicle) {
-    return (
-      <section className="page">
-        <h1>Хроника</h1>
-        <p>Не удалось загрузить хронику.</p>
-      </section>
-    );
-  }
+  useEffect(() => {
+    if (!id || !isChronicleAuthor) {
+      setChronicleNpcs([]);
+      setNpcLoading(false);
+      return;
+    }
+
+    let active = true;
+
+    async function loadChronicleNpcs() {
+      setNpcLoading(true);
+      try {
+        const query = deferredNpcSearch.trim();
+        const path = query
+          ? `/chronicles/${id}/npcs?search=${encodeURIComponent(query)}`
+          : `/chronicles/${id}/npcs`;
+        const data = await api.get<ChronicleNpcDto[]>(path);
+        if (!active) return;
+        setChronicleNpcs(data);
+      } catch (err: any) {
+        if (!active) return;
+        pushToast(err?.message ?? "Не удалось загрузить NPC хроники", "error");
+      } finally {
+        if (active) {
+          setNpcLoading(false);
+        }
+      }
+    }
+
+    void loadChronicleNpcs();
+    return () => {
+      active = false;
+    };
+  }, [deferredNpcSearch, id, isChronicleAuthor, pushToast]);
+
+  useEffect(() => {
+    if (!id || !isChronicleAuthor || !npcModalOpen) {
+      setAvailableNpcs([]);
+      setAvailableNpcLoading(false);
+      return;
+    }
+
+    let active = true;
+
+    async function loadAvailableNpcs() {
+      setAvailableNpcLoading(true);
+      try {
+        const query = deferredAvailableNpcSearch.trim();
+        const path = query
+          ? `/chronicles/${id}/npcs/available?search=${encodeURIComponent(query)}`
+          : `/chronicles/${id}/npcs/available`;
+        const data = await api.get<NpcSummaryDto[]>(path);
+        if (!active) return;
+        setAvailableNpcs(data);
+      } catch (err: any) {
+        if (!active) return;
+        pushToast(err?.message ?? "Не удалось загрузить доступных NPC", "error");
+      } finally {
+        if (active) {
+          setAvailableNpcLoading(false);
+        }
+      }
+    }
+
+    void loadAvailableNpcs();
+    return () => {
+      active = false;
+    };
+  }, [deferredAvailableNpcSearch, id, isChronicleAuthor, npcModalOpen, pushToast]);
 
   const renderLogMessage = (log: ChronicleLogDto) => {
     if (log.type === "dice_roll" && log.data) {
@@ -126,8 +210,7 @@ export default function ChroniclePage() {
         <span className="log-text">
           Игрок <strong>{playerName}</strong>, персонаж <strong>{characterName}</strong>,{" "}
           <span className={`log-status ${kind}`}>{actionLabel}</span> типа {typeLabel}:{" "}
-          <span className={`log-amount ${kind}`}>{amount}</span>
-          .
+          <span className={`log-amount ${kind}`}>{amount}</span>.
         </span>
       );
     }
@@ -200,11 +283,11 @@ export default function ChroniclePage() {
           dataUrl: result,
           name: file.name
         });
-        setImages((prev) => {
-          const next = [image, ...prev];
-          next.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          return next;
-        });
+        setImages((prev) =>
+          [...prev, image].sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
+        );
       } catch (err: any) {
         pushToast(err?.message ?? "Не удалось загрузить картинку", "error");
       }
@@ -242,7 +325,6 @@ export default function ChroniclePage() {
     }
   };
 
-  
   const handleDeleteChronicle = async () => {
     if (!chronicle) return;
     const confirmDelete = window.confirm("Удалить хронику? Она исчезнет с главной страницы.");
@@ -255,6 +337,60 @@ export default function ChroniclePage() {
       pushToast(err?.message ?? "Не удалось удалить хронику", "error");
     }
   };
+
+  const handleBindNpc = async (npcId: string) => {
+    if (!id) return;
+    setBusyNpcId(npcId);
+    try {
+      const created = await api.post<ChronicleNpcDto>(`/chronicles/${id}/npcs`, { npcId });
+      setChronicleNpcs((prev) =>
+        sortByName(
+          [...prev.filter((item) => item.id !== created.id), created],
+          (item) => item.meta.name
+        )
+      );
+      setAvailableNpcs((prev) => prev.filter((item) => item.id !== created.id));
+      setAvailableNpcSearch("");
+      setNpcModalOpen(false);
+      pushToast("NPC привязан к хронике", "success");
+    } catch (err: any) {
+      pushToast(err?.message ?? "Не удалось привязать NPC", "error");
+    } finally {
+      setBusyNpcId(null);
+    }
+  };
+
+  const handleUnbindNpc = async (npcId: string) => {
+    if (!id) return;
+    setBusyNpcId(npcId);
+    try {
+      await api.del(`/chronicles/${id}/npcs/${npcId}`);
+      setChronicleNpcs((prev) => prev.filter((item) => item.id !== npcId));
+      pushToast("NPC убран из хроники", "success");
+    } catch (err: any) {
+      pushToast(err?.message ?? "Не удалось убрать NPC из хроники", "error");
+    } finally {
+      setBusyNpcId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <section className="page">
+        <h1>Хроника</h1>
+        <p>Загрузка…</p>
+      </section>
+    );
+  }
+
+  if (!chronicle) {
+    return (
+      <section className="page">
+        <h1>Хроника</h1>
+        <p>Не удалось загрузить хронику.</p>
+      </section>
+    );
+  }
 
   return (
     <section className="page">
@@ -368,11 +504,7 @@ export default function ChroniclePage() {
               <Link key={character.uuid} to={`/c/${character.uuid}`} className="character-card">
                 <div className="character-card-header">
                   {avatarUrl ? (
-                    <img
-                      className="character-avatar"
-                      src={avatarUrl}
-                      alt={name}
-                    />
+                    <img className="character-avatar" src={avatarUrl} alt={name} />
                   ) : (
                     <span className="character-avatar placeholder">{fallbackLetter}</span>
                   )}
@@ -397,6 +529,86 @@ export default function ChroniclePage() {
           {characters.length === 0 && <p>Пока нет персонажей.</p>}
         </div>
       </div>
+
+      {isChronicleAuthor && (
+        <div className="card">
+          <div className="card-header">
+            <div className="card-header-main">
+              <div className="section-title">NPC хроники</div>
+              <div className="st-meta">
+                <span>Author-only блок</span>
+                <span>Привязка не удаляет исходный NPC</span>
+              </div>
+            </div>
+            <div className="page-actions header-actions">
+              <button
+                type="button"
+                className="primary"
+                onClick={() => {
+                  setAvailableNpcSearch("");
+                  setNpcModalOpen(true);
+                }}
+              >
+                Добавить персонажа в хронику
+              </button>
+            </div>
+          </div>
+          <label className="field">
+            <span>Поиск по привязанным NPC</span>
+            <input
+              value={npcSearch}
+              onChange={(event) => setNpcSearch(event.target.value)}
+              placeholder="Введите имя NPC"
+            />
+          </label>
+          <div className="npc-inline-list">
+            {npcLoading ? (
+              <div className="home-empty">Загрузка…</div>
+            ) : chronicleNpcs.length === 0 ? (
+              <div className="home-empty">
+                {deferredNpcSearch.trim()
+                  ? "По этому запросу NPC в хронике не найдены."
+                  : "К этой хронике пока не привязан ни один NPC."}
+              </div>
+            ) : (
+              chronicleNpcs.map((npc) => {
+                const name = npc.meta.name?.trim() || "(Без имени)";
+                const avatarUrl = npc.meta.avatarUrl?.trim();
+                const subtitle = getNpcMetaSubtitle(npc.meta, dictionaries);
+                const fallbackLetter = getNpcFallbackLetter(name);
+                return (
+                  <div key={npc.id} className="npc-inline-item">
+                    <Link to={`/npcs/${npc.id}`} className="npc-inline-link">
+                      <div className="character-card-header">
+                        {avatarUrl ? (
+                          <img className="character-avatar" src={avatarUrl} alt={name} />
+                        ) : (
+                          <span className="character-avatar placeholder">{fallbackLetter}</span>
+                        )}
+                        <div className="character-card-title">
+                          <div className="character-card-name">{name}</div>
+                          <div className="character-card-sub">
+                            {subtitle || "Без клана и секты"}
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={busyNpcId === npc.id}
+                      onClick={() => handleUnbindNpc(npc.id)}
+                    >
+                      Убрать из хроники
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="card">
         <div className="card-header">
           <div className="section-title">Картинки хроники</div>
@@ -422,9 +634,7 @@ export default function ChroniclePage() {
           }}
         />
         <div className="chronicle-image-list">
-          {images.length === 0 && (
-            <div className="chronicle-image-empty">Пока нет картинок.</div>
-          )}
+          {images.length === 0 && <div className="chronicle-image-empty">Пока нет картинок.</div>}
           {images.map((image) => (
             <div key={image._id} className="chronicle-image-card">
               <button
@@ -462,9 +672,7 @@ export default function ChroniclePage() {
           {logs.length === 0 && <div className="log-empty">Нет событий.</div>}
           {logs.map((log) => (
             <div key={log._id} className="log-item">
-              <div className="log-time">
-                {new Date(log.createdAt).toLocaleString("ru-RU")}
-              </div>
+              <div className="log-time">{new Date(log.createdAt).toLocaleString("ru-RU")}</div>
               <div className="log-message">{renderLogMessage(log)}</div>
             </div>
           ))}
@@ -485,10 +693,7 @@ export default function ChroniclePage() {
             >
               ✕
             </button>
-            <img
-              src={selectedImage.dataUrl}
-              alt={selectedImage.name || "Картинка хроники"}
-            />
+            <img src={selectedImage.dataUrl} alt={selectedImage.name || "Картинка хроники"} />
             <div className="chronicle-image-modal-meta">
               <span>{selectedImage.name || "Без названия"}</span>
               <span>{new Date(selectedImage.createdAt).toLocaleString("ru-RU")}</span>
@@ -496,13 +701,19 @@ export default function ChroniclePage() {
           </div>
         </div>
       )}
+      <NpcPickerModal
+        open={npcModalOpen}
+        title="Добавить персонажа в хронику"
+        search={availableNpcSearch}
+        loading={availableNpcLoading}
+        items={availableNpcs}
+        emptyState="Нет NPC, доступных для привязки."
+        actionLabel="Добавить"
+        busyNpcId={busyNpcId}
+        onClose={() => setNpcModalOpen(false)}
+        onSearchChange={setAvailableNpcSearch}
+        onPick={handleBindNpc}
+      />
     </section>
   );
 }
-
-
-
-
-
-
-

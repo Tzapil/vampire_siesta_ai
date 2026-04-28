@@ -7,7 +7,6 @@ import {
   AttributeModel,
   BackgroundModel,
   ClanModel,
-  ChronicleModel,
   DemeanorModel,
   DisciplineModel,
   FlawModel,
@@ -72,8 +71,6 @@ type MeritFlawJsonItem = {
 };
 
 const DATA_DIR = path.resolve(__dirname, "../../../data");
-const DEFAULT_CHRONICLE_NAME = "Без хроники";
-
 function readJson<T>(fileName: string): T {
   const filePath = path.join(DATA_DIR, fileName);
   const raw = fs.readFileSync(filePath, "utf-8");
@@ -116,12 +113,6 @@ loadEnv();
 
 async function seed() {
   await connectToDatabase(process.env.MONGO_URL);
-
-  await ChronicleModel.updateOne(
-    { name: DEFAULT_CHRONICLE_NAME },
-    { $setOnInsert: { name: DEFAULT_CHRONICLE_NAME } },
-    { upsert: true }
-  );
 
   const generations = [
     { generation: 8, bloodPoolMax: 15, bloodPerTurn: 3 },

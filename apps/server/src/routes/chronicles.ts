@@ -1,14 +1,30 @@
-﻿import { Router } from "express";
+import { Router } from "express";
+import { isValidObjectId } from "mongoose";
 import {
   ChronicleImageModel,
   ChronicleLogModel,
   ChronicleModel,
+  ChronicleNpcLinkModel,
   CharacterModel,
-  CombatStateModel
+  CombatStateModel,
+  NpcModel
 } from "../db";
 import { asyncHandler } from "../utils/asyncHandler";
+import {
+  createCombatNpcSnapshot,
+  getNextNpcCopyOrdinal,
+  normalizeCombatNpcPatch
+} from "../utils/combatNpc";
 import { presentCharacter, presentCharacterList } from "../utils/characterPresenter";
 import { sanitizeCharacterForChronicleImport } from "../utils/characterTransfer";
+import { findActiveChronicleById, findChronicleForAuthor } from "../utils/chronicleAccess";
+import {
+  presentCombatNpc,
+  presentCombatState,
+  presentChronicleNpc,
+  presentNpcSummary
+} from "../utils/npcPresenter";
+import { buildSearchRegex, normalizeSearchQuery } from "../utils/npcValidation";
 import { generateUuid } from "../utils/uuid";
 import { loadDictionaries, validateAllWizardSteps } from "../validation/characterValidation";
 
@@ -32,6 +48,17 @@ function collectCharacterStructureErrors(character: any) {
   }
 
   return errors;
+}
+
+function sortByTrimmedName<T>(items: T[], getName: (item: T) => string | null | undefined) {
+  return [...items].sort((a, b) => {
+    const nameA = (getName(a) ?? "").trim();
+    const nameB = (getName(b) ?? "").trim();
+    if (!nameA && !nameB) return 0;
+    if (!nameA) return 1;
+    if (!nameB) return -1;
+    return nameA.localeCompare(nameB, "ru");
+  });
 }
 
 router.get(
@@ -112,15 +139,7 @@ router.get(
       )
       .lean();
 
-    const sorted = characters.sort((a, b) => {
-      const nameA = (a.meta?.name ?? "").trim();
-      const nameB = (b.meta?.name ?? "").trim();
-      if (!nameA && !nameB) return 0;
-      if (!nameA) return 1;
-      if (!nameB) return -1;
-      return nameA.localeCompare(nameB, "ru");
-    });
-
+    const sorted = sortByTrimmedName(characters, (item) => item.meta?.name);
     res.json(await presentCharacterList(sorted));
   })
 );
@@ -283,34 +302,211 @@ router.delete(
 );
 
 router.get(
+  "/chronicles/:id/npcs",
+  asyncHandler(async (req, res) => {
+    const authUser = req.auth?.user;
+    if (!authUser) {
+      res.status(401).json({ message: "Требуется авторизация" });
+      return;
+    }
+
+    const access = await findChronicleForAuthor(req.params.id, authUser.id);
+    if (!access.chronicle) {
+      res.status(access.status).json({ message: access.message });
+      return;
+    }
+
+    const search = normalizeSearchQuery(req.query.search);
+    const links = await ChronicleNpcLinkModel.find({ chronicleId: req.params.id }).lean();
+
+    if (links.length === 0) {
+      res.json([]);
+      return;
+    }
+
+    const filter: Record<string, unknown> = {
+      _id: { $in: links.map((item) => item.npcId) },
+      deleted: { $ne: true }
+    };
+    if (search) {
+      filter["meta.name"] = buildSearchRegex(search);
+    }
+
+    const npcs = await NpcModel.find(filter).lean();
+    const linkByNpcId = new Map(links.map((item) => [String(item.npcId), item]));
+    const sorted = sortByTrimmedName(npcs, (item) => item.meta?.name);
+
+    res.json(
+      sorted.map((npc) => presentChronicleNpc(npc, linkByNpcId.get(String(npc._id))))
+    );
+  })
+);
+
+router.get(
+  "/chronicles/:id/npcs/available",
+  asyncHandler(async (req, res) => {
+    const authUser = req.auth?.user;
+    if (!authUser) {
+      res.status(401).json({ message: "Требуется авторизация" });
+      return;
+    }
+
+    const access = await findChronicleForAuthor(req.params.id, authUser.id);
+    if (!access.chronicle) {
+      res.status(access.status).json({ message: access.message });
+      return;
+    }
+
+    const search = normalizeSearchQuery(req.query.search);
+    const existingLinks = await ChronicleNpcLinkModel.find({ chronicleId: req.params.id })
+      .select("npcId")
+      .lean();
+
+    const filter: Record<string, unknown> = {
+      deleted: { $ne: true }
+    };
+    if (existingLinks.length > 0) {
+      filter._id = { $nin: existingLinks.map((item) => item.npcId) };
+    }
+    if (search) {
+      filter["meta.name"] = buildSearchRegex(search);
+    }
+
+    const npcs = await NpcModel.find(filter).lean();
+    const sorted = sortByTrimmedName(npcs, (item) => item.meta?.name);
+    res.json(sorted.map((npc) => presentNpcSummary(npc)));
+  })
+);
+
+router.post(
+  "/chronicles/:id/npcs",
+  asyncHandler(async (req, res) => {
+    const authUser = req.auth?.user;
+    if (!authUser) {
+      res.status(401).json({ message: "Требуется авторизация" });
+      return;
+    }
+
+    const access = await findChronicleForAuthor(req.params.id, authUser.id);
+    if (!access.chronicle) {
+      res.status(access.status).json({ message: access.message });
+      return;
+    }
+
+    const npcId = typeof req.body?.npcId === "string" ? req.body.npcId.trim() : "";
+    if (!npcId || !isValidObjectId(npcId)) {
+      res.status(400).json({ message: "npcId обязателен" });
+      return;
+    }
+
+    const npc = await NpcModel.findOne({
+      _id: npcId,
+      deleted: { $ne: true }
+    }).lean();
+    if (!npc) {
+      res.status(404).json({ message: "NPC не найден" });
+      return;
+    }
+
+    const result = await ChronicleNpcLinkModel.updateOne(
+      { chronicleId: req.params.id, npcId },
+      { $setOnInsert: { addedByUserId: authUser.id } },
+      { upsert: true }
+    );
+
+    const link = await ChronicleNpcLinkModel.findOne({
+      chronicleId: req.params.id,
+      npcId
+    }).lean();
+
+    if (!link) {
+      res.status(500).json({ message: "Не удалось привязать NPC к хронике" });
+      return;
+    }
+
+    res
+      .status(result.upsertedCount > 0 ? 201 : 200)
+      .json(presentChronicleNpc(npc, link));
+  })
+);
+
+router.delete(
+  "/chronicles/:id/npcs/:npcId",
+  asyncHandler(async (req, res) => {
+    const authUser = req.auth?.user;
+    if (!authUser) {
+      res.status(401).json({ message: "Требуется авторизация" });
+      return;
+    }
+
+    const access = await findChronicleForAuthor(req.params.id, authUser.id);
+    if (!access.chronicle) {
+      res.status(access.status).json({ message: access.message });
+      return;
+    }
+
+    if (!isValidObjectId(req.params.npcId)) {
+      res.status(404).json({ message: "Привязка NPC не найдена" });
+      return;
+    }
+
+    const deleted = await ChronicleNpcLinkModel.findOneAndDelete({
+      chronicleId: req.params.id,
+      npcId: req.params.npcId
+    }).lean();
+
+    if (!deleted) {
+      res.status(404).json({ message: "Привязка NPC не найдена" });
+      return;
+    }
+
+    res.status(204).end();
+  })
+);
+
+router.get(
   "/chronicles/:id/combat",
   asyncHandler(async (req, res) => {
-    const chronicleExists = await ChronicleModel.exists({ _id: req.params.id });
-    if (!chronicleExists) {
+    const chronicle = await findActiveChronicleById(req.params.id);
+    if (!chronicle) {
       res.status(404).json({ message: "Хроника не найдена" });
       return;
     }
-    const found = await CombatStateModel.findOne({ chronicleId: req.params.id });
-    const combat = found ?? (await CombatStateModel.create({ chronicleId: req.params.id }));
-    res.json(combat.toObject({ flattenMaps: true }));
+
+    let combat = await CombatStateModel.findOne({ chronicleId: req.params.id });
+    if (!combat) {
+      combat = await CombatStateModel.create({ chronicleId: req.params.id });
+    }
+
+    res.json(presentCombatState(combat.toObject({ flattenMaps: true })));
   })
 );
 
 router.post(
   "/chronicles/:id/combat/start",
   asyncHandler(async (req, res) => {
-    const chronicleExists = await ChronicleModel.exists({ _id: req.params.id });
-    if (!chronicleExists) {
+    const chronicle = await findActiveChronicleById(req.params.id);
+    if (!chronicle) {
       res.status(404).json({ message: "Хроника не найдена" });
       return;
     }
+
     const previous = await CombatStateModel.findOne({ chronicleId: req.params.id }).lean();
     const wasActive = Boolean(previous?.active);
     const combat = await CombatStateModel.findOneAndUpdate(
       { chronicleId: req.params.id },
-      { $set: { active: true, initiatives: {}, enemies: [] } },
+      {
+        $set: {
+          active: true,
+          initiatives: {},
+          npcs: [],
+          npcCopyCounters: {},
+          enemies: []
+        }
+      },
       { new: true, upsert: true }
     );
+
     if (!wasActive) {
       await ChronicleLogModel.create({
         chronicleId: req.params.id,
@@ -318,7 +514,17 @@ router.post(
         message: "Бой начался"
       });
     }
-    res.json(combat?.toObject({ flattenMaps: true }) ?? { ok: true });
+
+    res.json(
+      presentCombatState(
+        combat?.toObject({ flattenMaps: true }) ?? {
+          chronicleId: req.params.id,
+          initiatives: {},
+          npcs: [],
+          active: true
+        }
+      )
+    );
   })
 );
 
@@ -348,70 +554,161 @@ router.post(
 );
 
 router.post(
-  "/chronicles/:id/combat/enemies",
+  "/chronicles/:id/combat/npcs",
   asyncHandler(async (req, res) => {
-    const { name, dexterity, wits } = req.body ?? {};
-    if (!name || typeof name !== "string") {
-      res.status(400).json({ message: "Имя обязательно" });
+    const authUser = req.auth?.user;
+    if (!authUser) {
+      res.status(401).json({ message: "Требуется авторизация" });
       return;
     }
-    const safeName = name.trim().slice(0, 80);
-    const dex = Number(dexterity ?? 0);
-    const wit = Number(wits ?? 0);
-    const combat = await CombatStateModel.findOneAndUpdate(
-      { chronicleId: req.params.id },
-      {
-        $push: {
-          enemies: {
-            name: safeName,
-            dexterity: Number.isFinite(dex) ? dex : 0,
-            wits: Number.isFinite(wit) ? wit : 0,
-            health: { bashing: 0, lethal: 0, aggravated: 0 },
-            dead: false
-          }
-        }
-      },
-      { new: true, upsert: true }
-    ).lean();
-    const enemy = (combat as any)?.enemies?.[(combat as any)?.enemies?.length - 1];
-    res.status(201).json(enemy);
+
+    const access = await findChronicleForAuthor(req.params.id, authUser.id);
+    if (!access.chronicle) {
+      res.status(access.status).json({ message: access.message });
+      return;
+    }
+
+    const npcId = typeof req.body?.npcId === "string" ? req.body.npcId.trim() : "";
+    if (!npcId || !isValidObjectId(npcId)) {
+      res.status(400).json({ message: "npcId обязателен" });
+      return;
+    }
+
+    const linkExists = await ChronicleNpcLinkModel.exists({
+      chronicleId: req.params.id,
+      npcId
+    });
+    if (!linkExists) {
+      res.status(404).json({ message: "NPC не привязан к этой хронике" });
+      return;
+    }
+
+    const npc = await NpcModel.findOne({
+      _id: npcId,
+      deleted: { $ne: true }
+    }).lean();
+    if (!npc) {
+      res.status(404).json({ message: "NPC не найден" });
+      return;
+    }
+
+    const combat = await CombatStateModel.findOne({ chronicleId: req.params.id });
+    if (!combat || !combat.active) {
+      res.status(409).json({ message: "Бой не активен" });
+      return;
+    }
+
+    const plainCombat = combat.toObject({ flattenMaps: true });
+    const nextOrdinal = getNextNpcCopyOrdinal(plainCombat.npcCopyCounters, npcId);
+    const snapshot = createCombatNpcSnapshot(npc, nextOrdinal);
+
+    combat.set(`npcCopyCounters.${npcId}`, nextOrdinal);
+    (combat.get("npcs") as any[]).push(snapshot);
+    await combat.save();
+
+    const updatedCombat = combat.toObject({ flattenMaps: true });
+    const createdNpc = updatedCombat.npcs[updatedCombat.npcs.length - 1];
+
+    res.status(201).json(presentCombatNpc(createdNpc));
+  })
+);
+
+router.patch(
+  "/chronicles/:id/combat/npcs/:combatNpcId",
+  asyncHandler(async (req, res) => {
+    const authUser = req.auth?.user;
+    if (!authUser) {
+      res.status(401).json({ message: "Требуется авторизация" });
+      return;
+    }
+
+    const access = await findChronicleForAuthor(req.params.id, authUser.id);
+    if (!access.chronicle) {
+      res.status(access.status).json({ message: access.message });
+      return;
+    }
+
+    const { value, errors } = normalizeCombatNpcPatch(req.body);
+    if (errors.length > 0) {
+      res.status(400).json({ errors });
+      return;
+    }
+
+    const combat = await CombatStateModel.findOne({ chronicleId: req.params.id });
+    if (!combat || !combat.active) {
+      res.status(409).json({ message: "Бой не активен" });
+      return;
+    }
+
+    const combatNpc = (combat.get("npcs") as any)?.id?.(req.params.combatNpcId);
+    if (!combatNpc) {
+      res.status(404).json({ message: "NPC в бою не найден" });
+      return;
+    }
+
+    if (value.health) {
+      combatNpc.health = value.health;
+    }
+    if (typeof value.dead === "boolean") {
+      combatNpc.dead = value.dead;
+    }
+    if (value.initiative) {
+      combatNpc.initiative = value.initiative;
+    }
+
+    await combat.save();
+    res.json(presentCombatNpc(combatNpc.toObject()));
+  })
+);
+
+router.delete(
+  "/chronicles/:id/combat/npcs/:combatNpcId",
+  asyncHandler(async (req, res) => {
+    const authUser = req.auth?.user;
+    if (!authUser) {
+      res.status(401).json({ message: "Требуется авторизация" });
+      return;
+    }
+
+    const access = await findChronicleForAuthor(req.params.id, authUser.id);
+    if (!access.chronicle) {
+      res.status(access.status).json({ message: access.message });
+      return;
+    }
+
+    const combat = await CombatStateModel.findOne({ chronicleId: req.params.id });
+    if (!combat || !combat.active) {
+      res.status(409).json({ message: "Бой не активен" });
+      return;
+    }
+
+    const combatNpc = (combat.get("npcs") as any)?.id?.(req.params.combatNpcId);
+    if (!combatNpc) {
+      res.status(404).json({ message: "NPC в бою не найден" });
+      return;
+    }
+
+    combatNpc.deleteOne();
+    await combat.save();
+    res.status(204).end();
+  })
+);
+
+router.post(
+  "/chronicles/:id/combat/enemies",
+  asyncHandler(async (_req, res) => {
+    res.status(410).json({
+      message: "Ручные противники отключены. Используйте NPC, привязанных к хронике."
+    });
   })
 );
 
 router.patch(
   "/chronicles/:id/combat/enemies/:enemyId",
-  asyncHandler(async (req, res) => {
-    const { health, dead, initiative, name } = req.body ?? {};
-    const updates: Record<string, unknown> = {};
-    if (health && typeof health === "object") {
-      updates["enemies.$.health"] = health;
-    }
-    if (typeof dead === "boolean") {
-      updates["enemies.$.dead"] = dead;
-    }
-    if (initiative && typeof initiative === "object") {
-      updates["enemies.$.initiative"] = initiative;
-    }
-    if (typeof name === "string" && name.trim().length > 0) {
-      updates["enemies.$.name"] = name.trim().slice(0, 80);
-    }
-    if (Object.keys(updates).length === 0) {
-      res.status(400).json({ message: "Нет данных для обновления" });
-      return;
-    }
-    const combat = await CombatStateModel.findOneAndUpdate(
-      { chronicleId: req.params.id, "enemies._id": req.params.enemyId },
-      { $set: updates },
-      { new: true }
-    ).lean();
-    const enemy = (combat as any)?.enemies?.find(
-      (item: any) => String(item._id) === String(req.params.enemyId)
-    );
-    if (!enemy) {
-      res.status(404).json({ message: "Противник не найден" });
-      return;
-    }
-    res.json(enemy);
+  asyncHandler(async (_req, res) => {
+    res.status(410).json({
+      message: "Ручные противники отключены. Используйте NPC, привязанных к хронике."
+    });
   })
 );
 
@@ -420,7 +717,15 @@ router.delete(
   asyncHandler(async (req, res) => {
     await CombatStateModel.findOneAndUpdate(
       { chronicleId: req.params.id },
-      { $set: { initiatives: {}, enemies: [], active: false } },
+      {
+        $set: {
+          initiatives: {},
+          npcs: [],
+          npcCopyCounters: {},
+          enemies: [],
+          active: false
+        }
+      },
       { upsert: true }
     );
     await ChronicleLogModel.create({

@@ -3,14 +3,21 @@ import type {
   AggregatedDictionariesDto as SharedAggregatedDictionariesDto,
   AttributeDto as SharedAttributeDto,
   CharacterSummaryDto as SharedCharacterSummaryDto,
+  ChronicleNpcDto as SharedChronicleNpcDto,
   ChronicleDto as SharedChronicleDto,
   ClanDto as SharedClanDto,
+  CombatInitiativeDto as SharedCombatInitiativeDto,
+  CombatNpcDto as SharedCombatNpcDto,
+  CombatStateDto as SharedCombatStateDto,
   DictItem as SharedDictItem,
   FlawDto as SharedFlawDto,
   GenerationDto as SharedGenerationDto,
   HomeScreenDto as SharedHomeScreenDto,
   LayeredValue as SharedLayeredValue,
-  MeritDto as SharedMeritDto
+  MeritDto as SharedMeritDto,
+  NpcDto as SharedNpcDto,
+  NpcInputDto as SharedNpcInputDto,
+  NpcSummaryDto as SharedNpcSummaryDto
 } from "@siesta/shared";
 
 export type DictItem = SharedDictItem;
@@ -25,6 +32,13 @@ export type CharacterSummaryDto = SharedCharacterSummaryDto;
 export type LayeredValue = SharedLayeredValue;
 export type AggregatedDictionariesDto = SharedAggregatedDictionariesDto;
 export type HomeScreenDto = SharedHomeScreenDto;
+export type NpcInputDto = SharedNpcInputDto;
+export type NpcDto = SharedNpcDto;
+export type NpcSummaryDto = SharedNpcSummaryDto;
+export type ChronicleNpcDto = SharedChronicleNpcDto;
+export type CombatInitiativeDto = SharedCombatInitiativeDto;
+export type CombatNpcDto = SharedCombatNpcDto;
+export type CombatStateDto = SharedCombatStateDto;
 
 export type ChronicleLogDto = {
   _id: string;
@@ -64,32 +78,6 @@ export type AuthUserDto = {
   lastSeenAt: string;
   lastLoginAt: string;
   avatarUrl: string | null;
-};
-
-export type CombatInitiativeDto = {
-  dexterity: number;
-  wits: number;
-  base: number;
-  roll: number;
-  total: number;
-};
-
-export type CombatEnemyDto = {
-  _id: string;
-  name: string;
-  dexterity: number;
-  wits: number;
-  health: { bashing: number; lethal: number; aggravated: number };
-  dead: boolean;
-  initiative?: CombatInitiativeDto;
-};
-
-export type CombatStateDto = {
-  _id: string;
-  chronicleId: string;
-  initiatives: Record<string, CombatInitiativeDto>;
-  enemies: CombatEnemyDto[];
-  active: boolean;
 };
 
 export type PriorityRank = "primary" | "secondary" | "tertiary";

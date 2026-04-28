@@ -78,6 +78,9 @@ export default function CharacterPage() {
   const { sendPatch } = useCharacterSocket(uuid, {
     currentVersion: character?.version,
     onPatchApplied,
+    onPatchConfirmed: (payload) => {
+      setCharacter((prev) => (prev ? { ...prev, version: payload.version } : prev));
+    },
     onResync,
     onReject
   });
