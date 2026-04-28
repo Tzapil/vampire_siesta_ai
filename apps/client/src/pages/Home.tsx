@@ -55,30 +55,25 @@ export default function Home() {
         <div className="home-actions">
           <Link
             to="/chronicles/new"
-            className="icon-button"
+            className="icon-button npc-create-icon-button"
             title="Создать хронику"
             aria-label="Создать хронику"
           >
-            ✓
+            +
           </Link>
         </div>
       </div>
 
-      <div className="card home-card">
-        <div className="card-header">
-          <div className="section-title">Неигровые персонажи</div>
-        </div>
-        <div className="home-npc-cta">
-          <div>
-            <strong>Глобальный каталог NPC</strong>
-            <p className="home-subtitle">
-              Отдельный раздел для создания, просмотра и подготовки неигровых персонажей.
-            </p>
+      <div className="card home-card home-npc-card">
+        <Link to="/npcs" className="home-npc-panel">
+          <div className="home-npc-copy">
+            <div className="section-title">Неигровые персонажи</div>
+            <strong className="home-npc-title">Каталог NPC</strong>
           </div>
-          <Link to="/npcs" className="primary npc-link-button">
-            Открыть каталог
-          </Link>
-        </div>
+          <span className="home-npc-open" aria-hidden="true">
+            →
+          </span>
+        </Link>
       </div>
 
       <div className="card home-card">
@@ -156,7 +151,7 @@ export default function Home() {
             ))}
             {chronicles.length === 0 && (
               <div className="home-empty">
-                Пока нет хроник. Нажмите ✓, чтобы создать первую.
+                Пока нет хроник. Нажмите +, чтобы создать первую.
               </div>
             )}
           </div>

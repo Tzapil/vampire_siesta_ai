@@ -533,23 +533,19 @@ export default function ChroniclePage() {
       {isChronicleAuthor && (
         <div className="card">
           <div className="card-header">
-            <div className="card-header-main">
-              <div className="section-title">NPC хроники</div>
-              <div className="st-meta">
-                <span>Author-only блок</span>
-                <span>Привязка не удаляет исходный NPC</span>
-              </div>
-            </div>
+            <div className="section-title">NPC хроники</div>
             <div className="page-actions header-actions">
               <button
                 type="button"
-                className="primary"
+                className="icon-button npc-create-icon-button"
+                title="Добавить NPC"
+                aria-label="Добавить NPC"
                 onClick={() => {
                   setAvailableNpcSearch("");
                   setNpcModalOpen(true);
                 }}
               >
-                Добавить персонажа в хронику
+                +
               </button>
             </div>
           </div>
@@ -595,11 +591,13 @@ export default function ChroniclePage() {
                     </Link>
                     <button
                       type="button"
-                      className="secondary"
+                      className="icon-button danger"
+                      title="Убрать из хроники"
+                      aria-label="Убрать из хроники"
                       disabled={busyNpcId === npc.id}
                       onClick={() => handleUnbindNpc(npc.id)}
                     >
-                      Убрать из хроники
+                      {"\uD83D\uDDD1"}
                     </button>
                   </div>
                 );
@@ -703,7 +701,7 @@ export default function ChroniclePage() {
       )}
       <NpcPickerModal
         open={npcModalOpen}
-        title="Добавить персонажа в хронику"
+        title="Добавить NPC в хронику"
         search={availableNpcSearch}
         loading={availableNpcLoading}
         items={availableNpcs}

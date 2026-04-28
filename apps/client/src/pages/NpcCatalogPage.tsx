@@ -53,8 +53,13 @@ export default function NpcCatalogPage() {
             </div>
           </div>
           <div className="page-actions header-actions">
-            <Link to="/npcs/new" className="primary npc-link-button">
-              Создать NPC
+            <Link
+              to="/npcs/new"
+              className="icon-button npc-create-icon-button"
+              title="Создать NPC"
+              aria-label="Создать NPC"
+            >
+              +
             </Link>
           </div>
         </div>

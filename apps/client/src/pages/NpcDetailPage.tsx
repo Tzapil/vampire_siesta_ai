@@ -115,8 +115,13 @@ export default function NpcDetailPage() {
               <Link to="/npcs" className="icon-button" title="Назад к каталогу">
                 ←
               </Link>
-              <Link to={`/npcs/${npc.id}/edit`} className="primary npc-link-button">
-                Редактировать
+              <Link
+                to={`/npcs/${npc.id}/edit`}
+                className="icon-button"
+                title="Редактировать NPC"
+                aria-label="Редактировать NPC"
+              >
+                ✎
               </Link>
               <button
                 type="button"

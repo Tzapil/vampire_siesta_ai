@@ -3558,12 +3558,84 @@ button.secondary {
   background: var(--theme-accent-strong);
 }
 
+.npc-create-icon-button {
+  font-size: 24px;
+  font-weight: 500;
+}
+
 .home-npc-cta {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
+}
+
+.home-npc-card {
+  padding: 14px;
+}
+
+.home-npc-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 55%),
+    rgba(10, 13, 19, 0.18);
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.home-npc-panel:hover {
+  border-color: rgba(217, 181, 108, 0.32);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 55%),
+    rgba(217, 181, 108, 0.04);
+  transform: translateY(-1px);
+}
+
+.home-npc-copy {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.home-npc-card .section-title {
+  font-size: 13px;
+  letter-spacing: 0.2em;
+}
+
+.home-npc-title {
+  font-size: 22px;
+  font-weight: 600;
+  font-family: "Cormorant Garamond", "Sora", serif;
+  letter-spacing: 0.04em;
+  color: #fff4de;
+}
+
+.home-npc-open {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid var(--theme-border);
+  background: var(--theme-surface-3);
+  color: var(--theme-muted);
+  font-size: 20px;
+  line-height: 1;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.home-npc-panel:hover .home-npc-open {
+  border-color: rgba(217, 181, 108, 0.55);
+  color: #fff4de;
+  background: rgba(217, 181, 108, 0.1);
+  transform: translateX(1px);
 }
 
 .npc-summary {
@@ -4042,6 +4114,15 @@ button.secondary {
   .npc-inline-item {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .home-npc-panel {
+    grid-template-columns: 1fr auto;
+    padding: 12px 14px;
+  }
+
+  .home-npc-title {
+    font-size: 20px;
   }
 
   .npc-link-button {
