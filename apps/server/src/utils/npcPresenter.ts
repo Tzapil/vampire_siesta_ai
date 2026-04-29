@@ -1,5 +1,6 @@
 import type {
   ChronicleNpcDto,
+  CombatInitiativeDto,
   CombatNpcDto,
   CombatStateDto,
   NpcDto,
@@ -98,6 +99,18 @@ export function presentChronicleNpc(npc: any, link: any): ChronicleNpcDto {
   };
 }
 
+function presentCombatInitiative(input: any): CombatInitiativeDto {
+  const manual = Boolean(input?.manual);
+  return {
+    dexterity: Number(input?.dexterity ?? 0),
+    wits: Number(input?.wits ?? 0),
+    base: Number(input?.base ?? 0),
+    roll: Number(input?.roll ?? 0),
+    total: Number(input?.total ?? 0),
+    ...(manual ? { manual: true } : {})
+  };
+}
+
 export function presentCombatNpc(input: any): CombatNpcDto {
   return {
     _id: String(input?._id ?? ""),
@@ -113,26 +126,21 @@ export function presentCombatNpc(input: any): CombatNpcDto {
     wits: Number(input?.wits ?? 0),
     health: presentHealth(input?.health),
     dead: Boolean(input?.dead),
-    initiative: input?.initiative
-      ? {
-          dexterity: Number(input.initiative.dexterity ?? 0),
-          wits: Number(input.initiative.wits ?? 0),
-          base: Number(input.initiative.base ?? 0),
-          roll: Number(input.initiative.roll ?? 0),
-          total: Number(input.initiative.total ?? 0)
-        }
-      : undefined
+    initiative: input?.initiative ? presentCombatInitiative(input.initiative) : undefined
   };
 }
 
 export function presentCombatState(input: any): CombatStateDto {
+  const source =
+    input?.initiatives instanceof Map
+      ? Object.fromEntries(input.initiatives.entries())
+      : { ...(input?.initiatives ?? {}) };
   return {
     _id: String(input?._id ?? ""),
     chronicleId: String(input?.chronicleId ?? ""),
-    initiatives:
-      input?.initiatives instanceof Map
-        ? Object.fromEntries(input.initiatives.entries())
-        : { ...(input?.initiatives ?? {}) },
+    initiatives: Object.fromEntries(
+      Object.entries(source).map(([key, value]) => [key, presentCombatInitiative(value)])
+    ),
     npcs: Array.isArray(input?.npcs) ? input.npcs.map((item: any) => presentCombatNpc(item)) : [],
     active: Boolean(input?.active)
   };

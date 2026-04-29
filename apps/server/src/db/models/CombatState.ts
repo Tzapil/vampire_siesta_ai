@@ -6,7 +6,8 @@ const InitiativeSchema = new Schema(
     wits: { type: Number, default: 0 },
     base: { type: Number, default: 0 },
     roll: { type: Number, default: 0 },
-    total: { type: Number, default: 0 }
+    total: { type: Number, default: 0 },
+    manual: { type: Boolean, default: false }
   },
   { _id: false }
 );

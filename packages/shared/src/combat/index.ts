@@ -6,6 +6,7 @@ export type CombatInitiativeDto = {
   base: number;
   roll: number;
   total: number;
+  manual?: boolean;
 };
 
 export type CombatNpcDto = {

@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type {
@@ -86,6 +86,10 @@ function HealthTrackDisplay({
   );
 }
 
+function getParticipantInitiativeKey(participant: Participant) {
+  return `${participant.type}-${participant.id}`;
+}
+
 export default function CombatPage() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -101,6 +105,8 @@ export default function CombatPage() {
   const deferredNpcSearch = useDeferredValue(npcSearch);
   const [npcLoading, setNpcLoading] = useState(false);
   const [busyNpcId, setBusyNpcId] = useState<string | null>(null);
+  const [editingInitiativeKey, setEditingInitiativeKey] = useState<string | null>(null);
+  const [initiativeDraft, setInitiativeDraft] = useState("");
 
   const logCombatEvent = async (payload: {
     type: string;
@@ -282,28 +288,69 @@ export default function CombatPage() {
     };
   };
 
-  const handleCharacterInitiative = async (participant: Participant) => {
-    if (participant.type !== "character" || !id) return;
-    const initiative = rollInitiative(participant.dexterity, participant.wits, participant.woundMod);
+  const createManualInitiative = (
+    dexterity: number,
+    wits: number,
+    total: number
+  ): CombatInitiativeDto => ({
+    dexterity,
+    wits,
+    base: dexterity + wits,
+    roll: 0,
+    total,
+    manual: true
+  });
+
+  const updateCharacterInitiative = (characterUuid: string, initiative: CombatInitiativeDto) => {
+    setCombat((prev) =>
+      prev
+        ? {
+            ...prev,
+            initiatives: {
+              ...(prev.initiatives ?? {}),
+              [characterUuid]: initiative
+            }
+          }
+        : prev
+    );
+  };
+
+  const saveCharacterInitiative = async (
+    participant: Extract<Participant, { type: "character" }>,
+    initiative: CombatInitiativeDto,
+    errorMessage: string
+  ) => {
+    if (!id) return false;
+    const previous = participant.initiative;
+    updateCharacterInitiative(participant.id, initiative);
+
     try {
       const result = await api.post<{ characterUuid: string; initiative: CombatInitiativeDto }>(
         `/chronicles/${id}/combat/initiative`,
         { characterUuid: participant.id, initiative }
       );
-      setCombat((prev) =>
-        prev
-          ? {
-              ...prev,
-              initiatives: {
-                ...(prev.initiatives ?? {}),
-                [result.characterUuid]: result.initiative
-              }
-            }
-          : prev
-      );
+      updateCharacterInitiative(result.characterUuid, result.initiative);
+      return true;
     } catch (err: any) {
-      pushToast(err?.message ?? "Не удалось бросить инициативу", "error");
+      setCombat((prev) => {
+        if (!prev) return prev;
+        const next = { ...(prev.initiatives ?? {}) };
+        if (previous) {
+          next[participant.id] = previous;
+        } else {
+          delete next[participant.id];
+        }
+        return { ...prev, initiatives: next };
+      });
+      pushToast(err?.message ?? errorMessage, "error");
+      return false;
     }
+  };
+
+  const handleCharacterInitiative = async (participant: Participant) => {
+    if (participant.type !== "character") return;
+    const initiative = rollInitiative(participant.dexterity, participant.wits, participant.woundMod);
+    await saveCharacterInitiative(participant, initiative, "Не удалось бросить инициативу");
   };
 
   const updateNpcInCombat = (updated: CombatNpcDto) => {
@@ -312,6 +359,19 @@ export default function CombatPage() {
         ? {
             ...prev,
             npcs: prev.npcs.map((item) => (item._id === updated._id ? updated : item))
+          }
+        : prev
+    );
+  };
+
+  const updateNpcInitiative = (combatNpcId: string, initiative?: CombatInitiativeDto) => {
+    setCombat((prev) =>
+      prev
+        ? {
+            ...prev,
+            npcs: prev.npcs.map((item) =>
+              item._id === combatNpcId ? { ...item, initiative } : item
+            )
           }
         : prev
     );
@@ -333,6 +393,71 @@ export default function CombatPage() {
       });
     } catch (err: any) {
       pushToast(err?.message ?? "Не удалось бросить инициативу", "error");
+    }
+  };
+
+  const handleInitiativeEditStart = (participant: Participant) => {
+    setEditingInitiativeKey(getParticipantInitiativeKey(participant));
+    setInitiativeDraft(participant.initiative ? String(participant.initiative.total) : "");
+  };
+
+  const handleInitiativeEditCancel = () => {
+    setEditingInitiativeKey(null);
+    setInitiativeDraft("");
+  };
+
+  const handleInitiativeInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      event.currentTarget.blur();
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      handleInitiativeEditCancel();
+    }
+  };
+
+  const handleInitiativeEditSave = async (participant: Participant) => {
+    const trimmed = initiativeDraft.trim();
+    setEditingInitiativeKey(null);
+    setInitiativeDraft("");
+
+    if (!trimmed) {
+      return;
+    }
+
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed)) {
+      pushToast("Введите корректное значение инициативы", "error");
+      return;
+    }
+
+    const initiative = createManualInitiative(
+      participant.dexterity,
+      participant.wits,
+      Math.trunc(parsed)
+    );
+
+    if (participant.type === "character") {
+      await saveCharacterInitiative(participant, initiative, "Не удалось сохранить инициативу");
+      return;
+    }
+
+    if (!id) return;
+    const previous = participant.initiative;
+    updateNpcInitiative(participant.id, initiative);
+
+    try {
+      const updated = await api.patch<CombatNpcDto>(
+        `/chronicles/${id}/combat/npcs/${participant.id}`,
+        { initiative }
+      );
+      updateNpcInCombat(updated);
+    } catch (err: any) {
+      updateNpcInitiative(participant.id, previous);
+      pushToast(err?.message ?? "Не удалось сохранить инициативу", "error");
     }
   };
 
@@ -530,12 +655,17 @@ export default function CombatPage() {
                 const isNpc = participant.type === "npc";
                 const isDead = participant.type === "npc" ? participant.dead : false;
                 const initiative = participant.initiative;
+                const initiativeKey = getParticipantInitiativeKey(participant);
+                const initiativeEditing = editingInitiativeKey === initiativeKey;
+                const canEditInitiative = participant.type === "character" || isChronicleAuthor;
                 const initiativeLabel = initiative ? initiative.total : "—";
                 const woundLabel = participant.woundMod
                   ? ` + штраф ранений ${participant.woundMod}`
                   : "";
                 const initiativeMeta = initiative
-                  ? `${initiative.base} + d10(${initiative.roll})${woundLabel}`
+                  ? initiative.manual
+                    ? "Ручное значение"
+                    : `${initiative.base} + d10(${initiative.roll})${woundLabel}`
                   : `Ловкость + Смекалка${woundLabel}`;
 
                 const avatarLetter =
@@ -606,8 +736,25 @@ export default function CombatPage() {
                     </div>
                     <div className="combat-entry-actions">
                       <div className="combat-initiative">
-                        <div className="combat-initiative-value">{initiativeLabel}</div>
+                        {initiativeEditing ? (
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            autoFocus
+                            className="initiative-input combat-initiative-input"
+                            value={initiativeDraft}
+                            onChange={(event) => setInitiativeDraft(event.target.value)}
+                            onBlur={() => {
+                              void handleInitiativeEditSave(participant);
+                            }}
+                            onKeyDown={handleInitiativeInputKeyDown}
+                            aria-label="Текущее значение инициативы"
+                          />
+                        ) : (
+                          <div className="combat-initiative-value">{initiativeLabel}</div>
+                        )}
                         <div className="combat-initiative-meta">{initiativeMeta}</div>
+                        <div className="initiative-actions combat-initiative-actions">
                         {participant.type === "character" ? (
                           <button
                             type="button"
@@ -629,6 +776,18 @@ export default function CombatPage() {
                             ⚡
                           </button>
                         ) : null}
+                          {canEditInitiative ? (
+                            <button
+                              type="button"
+                              className="icon-button initiative-edit-button"
+                              onClick={() => handleInitiativeEditStart(participant)}
+                              title="Редактировать инициативу"
+                              aria-label="Редактировать инициативу"
+                            >
+                              ✎
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
 
                       <div className="combat-health">

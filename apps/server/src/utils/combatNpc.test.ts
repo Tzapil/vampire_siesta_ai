@@ -70,7 +70,8 @@ test("normalizeCombatNpcPatch accepts supported fields", () => {
       wits: 2,
       base: 5,
       roll: 7,
-      total: 12
+      total: 12,
+      manual: true
     }
   });
 
@@ -83,7 +84,8 @@ test("normalizeCombatNpcPatch accepts supported fields", () => {
       wits: 2,
       base: 5,
       roll: 7,
-      total: 12
+      total: 12,
+      manual: true
     }
   });
 });

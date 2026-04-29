@@ -1,5 +1,5 @@
 ﻿
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type {
@@ -15,6 +15,15 @@ import { useDictionaries } from "../context/DictionariesContext";
 import { useToast } from "../context/ToastContext";
 import { HelpPopoverButton, HelpPopoverGroup } from "./HelpPopover";
 import { HealthTrack } from "./HealthTrack";
+import { GameModeManeuversDrawer } from "./GameModeManeuversDrawer";
+import {
+  GAME_MODE_MANEUVER_GUIDE_SECTIONS,
+  GAME_MODE_MANEUVER_LEGEND,
+  getGameModeManeuverById,
+  getGameModeManeuversByGuideSection,
+  type GameModeCombatManeuver,
+  type GameModeManeuverTab
+} from "./gameModeCombatManeuvers";
 import { buildDictionaryHelpText } from "../utils/dictionaryHelp";
 import { woundPenalty } from "../utils/health";
 
@@ -54,6 +63,10 @@ function DotsDisplay({ total, max = 5 }: { total: number; max?: number }) {
     </div>
   );
 }
+
+const maneuverLegendById = new Map(
+  GAME_MODE_MANEUVER_LEGEND.map((item) => [item.id, item] as const)
+);
 
 export function GameMode({
   character,
@@ -98,22 +111,42 @@ export function GameMode({
   const [logOpen, setLogOpen] = useState(false);
   const [combatRulesOpen, setCombatRulesOpen] = useState(false);
   const [combatResolutionOpen, setCombatResolutionOpen] = useState(false);
-  const [meleeOpen, setMeleeOpen] = useState(false);
-  const [rangedOpen, setRangedOpen] = useState(false);
-  const [defenseOpen, setDefenseOpen] = useState(false);
-  const [multiOpen, setMultiOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState<Record<GameModeManeuverTab, boolean>>({
+    attack: false,
+    defense: false,
+    ranged: false,
+    special: false
+  });
+  const [maneuversOpen, setManeuversOpen] = useState(false);
+  const [activeManeuverTab, setActiveManeuverTab] = useState<GameModeManeuverTab>("attack");
+  const [expandedManeuverId, setExpandedManeuverId] = useState<string | null>(null);
+  const [activeManeuverId, setActiveManeuverId] = useState<string | null>(null);
   const [rollResult, setRollResult] = useState<{
     values: number[];
     successes: number;
     ones: number;
     net: number;
+    difficulty: number;
+    diceCount: number;
     status: "success" | "failure" | "botch";
   } | null>(null);
-  const [initiativeResult, setInitiativeResult] = useState<number | null>(null);
+  const [initiativeResult, setInitiativeResult] = useState<CombatInitiativeDto | null>(null);
   const [diceRolling, setDiceRolling] = useState(false);
   const [initiativeRolling, setInitiativeRolling] = useState(false);
+  const [initiativeEditOpen, setInitiativeEditOpen] = useState(false);
+  const [initiativeDraft, setInitiativeDraft] = useState("");
   const [selectedAttributeKey, setSelectedAttributeKey] = useState<string | null>(null);
   const [selectedAbilityKey, setSelectedAbilityKey] = useState<string | null>(null);
+  const initiativeFormula = initiativeResult?.manual
+    ? "Ручное"
+    : `Ловк + Смек + d10${woundMod !== 0 ? ` · ${woundMod > 0 ? "+" : ""}${woundMod}` : ""}`;
+  const rollStatusLabel = rollResult
+    ? rollResult.status === "success"
+      ? "Успех"
+      : rollResult.status === "botch"
+        ? "Критический провал"
+        : "Провал"
+    : "Ожидание";
 
   const selectedAttributeLabel = useMemo(
     () =>
@@ -127,18 +160,53 @@ export function GameMode({
     [dictionaries.abilities, selectedAbilityKey]
   );
 
+  const activeManeuver = useMemo(
+    () => (activeManeuverId ? getGameModeManeuverById(activeManeuverId) ?? null : null),
+    [activeManeuverId]
+  );
+
+  const activeManeuverBonus = activeManeuver?.preset?.diceBonus ?? 0;
+  const diceSelectionText = useMemo(() => {
+    if (!selectedAttributeLabel || !selectedAbilityLabel) {
+      return "Выберите атрибут и способность";
+    }
+
+    const parts = [`${selectedAttributeLabel} + ${selectedAbilityLabel}`];
+
+    if (activeManeuver) {
+      parts.push(
+        activeManeuverBonus !== 0
+          ? `${activeManeuver.title} ${activeManeuverBonus > 0 ? "+" : ""}${activeManeuverBonus}`
+          : activeManeuver.title
+      );
+    }
+
+    if (woundMod !== 0) {
+      parts.push(`ранения ${woundMod > 0 ? "+" : ""}${woundMod}`);
+    }
+
+    return parts.join(" · ");
+  }, [
+    activeManeuver,
+    activeManeuverBonus,
+    selectedAbilityLabel,
+    selectedAttributeLabel,
+    woundMod
+  ]);
+
   useEffect(() => {
     if (!selectedAttributeKey || !selectedAbilityKey) return;
     const attrTotal = totalFor(character.traits.attributes[selectedAttributeKey]);
     const abilityTotal = totalFor(character.traits.abilities[selectedAbilityKey]);
-    const next = clampNumber(attrTotal + abilityTotal + woundMod, 1, 20);
+    const next = clampNumber(attrTotal + abilityTotal + woundMod + activeManeuverBonus, 1, 20);
     setDiceCount(next);
   }, [
     selectedAttributeKey,
     selectedAbilityKey,
     character.traits.attributes,
     character.traits.abilities,
-    woundMod
+    woundMod,
+    activeManeuverBonus
   ]);
 
   useEffect(() => {
@@ -199,7 +267,7 @@ export function GameMode({
         const combat = await api.get<CombatStateDto>(`/chronicles/${chronicleId}/combat`);
         if (!active) return;
         const stored = combat?.initiatives?.[character.uuid];
-        setInitiativeResult(stored ? stored.total : null);
+        setInitiativeResult(stored ?? null);
       } catch {
         if (active) {
           setInitiativeResult((prev) => prev ?? null);
@@ -246,6 +314,14 @@ export function GameMode({
       });
   };
 
+  const updateDiceDifficulty = (value: number) => {
+    setDiceDifficulty(clampNumber(value, 1, 10));
+  };
+
+  const updateDiceCount = (value: number) => {
+    setDiceCount(clampNumber(value, 1, 20));
+  };
+
   const handleRollDice = () => {
     if (diceAnimTimeoutRef.current) {
       window.clearTimeout(diceAnimTimeoutRef.current);
@@ -271,7 +347,7 @@ export function GameMode({
       status = "botch";
     }
 
-    const result = { values, successes, ones, net, status };
+    const result = { values, successes, ones, net, difficulty, diceCount: count, status };
     setRollResult(result);
 
     const characterName = character.meta.name?.trim() || "(Без имени)";
@@ -301,7 +377,87 @@ export function GameMode({
     });
   };
 
-  const rollInitiative = (ignoreWoundPenalty = false) => {
+  const persistInitiative = async (initiative: CombatInitiativeDto, errorMessage: string) => {
+    const previous = initiativeResult;
+    setInitiativeResult(initiative);
+
+    const chronicleId = character.meta.chronicleId;
+    if (!chronicleId) {
+      return true;
+    }
+
+    try {
+      const response = await api.post<{ characterUuid: string; initiative: CombatInitiativeDto }>(
+        `/chronicles/${chronicleId}/combat/initiative`,
+        { characterUuid: character.uuid, initiative }
+      );
+      setInitiativeResult(response?.initiative ?? initiative);
+      return true;
+    } catch {
+      setInitiativeResult(previous);
+      pushToast(errorMessage, "error");
+      return false;
+    }
+  };
+
+  const createManualInitiative = (total: number): CombatInitiativeDto => {
+    const dexterity = totalFor(character.traits.attributes["dexterity"]);
+    const wits = totalFor(character.traits.attributes["wits"]);
+    return {
+      dexterity,
+      wits,
+      base: dexterity + wits,
+      roll: 0,
+      total,
+      manual: true
+    };
+  };
+
+  const handleInitiativeEditStart = () => {
+    setInitiativeDraft(initiativeResult ? String(initiativeResult.total) : "");
+    setInitiativeEditOpen(true);
+  };
+
+  const handleInitiativeEditCancel = () => {
+    setInitiativeEditOpen(false);
+    setInitiativeDraft("");
+  };
+
+  const handleInitiativeEditSave = async () => {
+    const trimmed = initiativeDraft.trim();
+    setInitiativeEditOpen(false);
+    setInitiativeDraft("");
+
+    if (!trimmed) {
+      return;
+    }
+
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed)) {
+      pushToast("Введите корректное значение инициативы", "error");
+      return;
+    }
+
+    await persistInitiative(
+      createManualInitiative(Math.trunc(parsed)),
+      "Не удалось сохранить инициативу для боя"
+    );
+  };
+
+  const handleInitiativeInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      event.currentTarget.blur();
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      handleInitiativeEditCancel();
+    }
+  };
+
+  const rollInitiative = () => {
     if (initiativeAnimTimeoutRef.current) {
       window.clearTimeout(initiativeAnimTimeoutRef.current);
     }
@@ -313,25 +469,19 @@ export function GameMode({
     const wits = totalFor(character.traits.attributes["wits"]);
     const base = dexterity + wits;
     const roll = 1 + Math.floor(Math.random() * 10);
-    const appliedWound = ignoreWoundPenalty ? 0 : woundMod;
-    const baseForCombat = base + appliedWound;
-    const total = baseForCombat + roll;
+    const total = base + woundMod + roll;
     const initiative: CombatInitiativeDto = {
       dexterity,
       wits,
-      base: baseForCombat,
+      base,
       roll,
       total
     };
-    setInitiativeResult(total);
+    setInitiativeResult(initiative);
 
     const characterName = character.meta.name?.trim() || "(Без имени)";
     const playerName = character.meta.playerName?.trim() || "Неизвестный игрок";
-    const woundLabel = ignoreWoundPenalty
-      ? " без штрафа ранений"
-      : woundMod !== 0
-        ? ` + штраф ранений ${woundMod}`
-        : "";
+    const woundLabel = woundMod !== 0 ? ` + штраф ранений ${woundMod}` : "";
     const message = `Игрок ${playerName}, персонаж ${characterName}, бросил инициативу: Ловкость ${dexterity} + Смекалка ${wits} + d10(${roll})${woundLabel} = ${total}.`;
 
     logChronicleEvent({
@@ -346,31 +496,12 @@ export function GameMode({
         base,
         roll,
         total,
-        woundMod: appliedWound,
-        ignoreWoundPenalty
+        woundMod
       }
     });
-
-    const chronicleId = character.meta.chronicleId;
-    if (chronicleId) {
-      api
-        .post<{ characterUuid: string; initiative: CombatInitiativeDto }>(
-          `/chronicles/${chronicleId}/combat/initiative`,
-          { characterUuid: character.uuid, initiative }
-        )
-        .then((response) => {
-          const stored = response?.initiative?.total;
-          if (typeof stored === "number") {
-            setInitiativeResult(stored);
-          }
-        })
-        .catch(() => {
-          pushToast("Не удалось сохранить инициативу для боя", "error");
-        });
-    }
+    void persistInitiative(initiative, "Не удалось сохранить инициативу для боя");
   };
-  const handleRollInitiative = () => rollInitiative(false);
-  const handleRollInitiativeNoWound = () => rollInitiative(true);
+  const handleRollInitiative = () => rollInitiative();
 
   const handleAvatarFile = async (file?: File | null) => {
     if (!file) return;
@@ -501,6 +632,45 @@ export function GameMode({
 
   const healAll = () => {
     handleHealthChange({ bashing: 0, lethal: 0, aggravated: 0 });
+  };
+
+  const toggleGuideSection = (section: GameModeManeuverTab) => {
+    setGuideOpen((prev) => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  const handleAttributeSelection = (key: string) => {
+    setActiveManeuverId(null);
+    setSelectedAttributeKey((prev) => (prev === key ? null : key));
+  };
+
+  const handleAbilitySelection = (key: string) => {
+    setActiveManeuverId(null);
+    setSelectedAbilityKey((prev) => (prev === key ? null : key));
+  };
+
+  const handleOpenManeuvers = () => {
+    if (activeManeuver) {
+      setActiveManeuverTab(activeManeuver.tab);
+    }
+    setManeuversOpen(true);
+  };
+
+  const handleApplyManeuver = (maneuver: GameModeCombatManeuver) => {
+    if (maneuver.applyMode === "disabled" || !maneuver.preset) {
+      return;
+    }
+    const { attributeKey, abilityKey, appliedDifficulty, diceBonus = 0 } = maneuver.preset;
+    const attrTotal = totalFor(character.traits.attributes[attributeKey]);
+    const abilityTotal = totalFor(character.traits.abilities[abilityKey]);
+    const nextDiceCount = clampNumber(attrTotal + abilityTotal + woundMod + diceBonus, 1, 20);
+    setSelectedAttributeKey(attributeKey);
+    setSelectedAbilityKey(abilityKey);
+    setDiceDifficulty(appliedDifficulty);
+    setDiceCount(nextDiceCount);
+    setActiveManeuverId(maneuver.id);
   };
 
   const renderLogMessage = (log: ChronicleLogDto) => {
@@ -698,6 +868,73 @@ export function GameMode({
             </div>
           );
         })}
+      </div>
+    );
+  };
+
+  const renderManeuverFlags = (flags: GameModeCombatManeuver["detailFlags"]) => {
+    if (flags.length === 0) return null;
+    return (
+      <span className="game-mode-guide-flags" aria-label="Особые пометки манёвра">
+        {flags.map((flag) => {
+          const legendItem = maneuverLegendById.get(flag);
+          if (!legendItem) return null;
+          return (
+            <span
+              key={flag}
+              className="game-mode-maneuver-flag"
+              title={legendItem.description}
+              aria-label={legendItem.description}
+            >
+              {legendItem.shortLabel}
+            </span>
+          );
+        })}
+      </span>
+    );
+  };
+
+  const renderManeuverGuideSection = (
+    section: (typeof GAME_MODE_MANEUVER_GUIDE_SECTIONS)[number]
+  ) => {
+    const isOpen = guideOpen[section.id];
+    const maneuvers = getGameModeManeuversByGuideSection(section.id);
+    return (
+      <div
+        key={section.id}
+        className={`guide-section collapsible-card ${isOpen ? "" : "collapsed"}`}
+      >
+        <div className="collapsible-header guide-header">
+          <span>{section.title}</span>
+          <button
+            type="button"
+            className="icon-button collapsible-toggle"
+            aria-expanded={isOpen}
+            title={isOpen ? "Свернуть" : "Развернуть"}
+            onClick={() => toggleGuideSection(section.id)}
+          >
+            {isOpen ? "▾" : "▸"}
+          </button>
+        </div>
+        <div className="collapsible-content rule-block">
+          {section.intro?.length ? (
+            <div className="guide-section-intro">
+              {section.intro.map((note) => (
+                <p key={note}>{note}</p>
+              ))}
+            </div>
+          ) : null}
+          <ul className="rule-list">
+            {maneuvers.map((maneuver) => (
+              <li key={maneuver.id}>
+                <strong>{maneuver.title}</strong>
+                {renderManeuverFlags(maneuver.detailFlags)} ({maneuver.summary.pool}); Сложность:{" "}
+                {maneuver.summary.difficulty}; Урон: {maneuver.summary.damage}.{" "}
+                {maneuver.detailText}
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     );
   };
@@ -969,44 +1206,95 @@ export function GameMode({
 
       <div className="sheet-row">
         <div className="sheet-card action-card dice-row">
-          <div className="dice-roller">
-            <div
-              className={`dice-panel ${diceRolling ? "is-rolling" : ""} ${
-                rollResult ? "has-result" : ""
-              }`}
+          <div className="game-mode-dice-toolbar">
+            <div className="dice-title">
+              <span className="dice-icon" aria-hidden="true">
+                🎲
+              </span>
+              Бросок кубиков
+            </div>
+            <button
+              type="button"
+              className="game-mode-maneuvers-button"
+              onClick={handleOpenManeuvers}
+              aria-expanded={maneuversOpen}
+              aria-controls="game-mode-maneuvers-drawer"
             >
+              ⚔ Манёвры
+            </button>
+          </div>
+          <div className="dice-roller">
+            <div className={`dice-panel ${diceRolling ? "is-rolling" : ""}`}>
               <div className="dice-main">
-                <div className="dice-title">
-                  <span className="dice-icon" aria-hidden="true">
-                    🎲
-                  </span>
-                  Бросок кубиков
-                </div>
                 <div className="dice-controls">
-                  <label className="dice-field">
+                  <div className="dice-field">
                     <span>Сложность</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={diceDifficulty}
-                      onChange={(event) =>
-                        setDiceDifficulty(clampNumber(Number(event.target.value || 0), 1, 10))
-                      }
-                    />
-                  </label>
-                  <label className="dice-field">
+                    <span className="dice-input-shell">
+                      <input
+                        type="number"
+                        min={1}
+                        max={10}
+                        inputMode="numeric"
+                        aria-label="Сложность броска"
+                        value={diceDifficulty}
+                        onChange={(event) => updateDiceDifficulty(Number(event.target.value || 0))}
+                      />
+                      <span className="dice-stepper-actions">
+                        <button
+                          type="button"
+                          className="icon-button dice-stepper-button"
+                          onClick={() => updateDiceDifficulty(diceDifficulty - 1)}
+                          disabled={diceDifficulty <= 1}
+                          aria-label="Уменьшить сложность"
+                        >
+                          −
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-button dice-stepper-button"
+                          onClick={() => updateDiceDifficulty(diceDifficulty + 1)}
+                          disabled={diceDifficulty >= 10}
+                          aria-label="Увеличить сложность"
+                        >
+                          +
+                        </button>
+                      </span>
+                    </span>
+                  </div>
+                  <div className="dice-field">
                     <span>Кубиков</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={diceCount}
-                      onChange={(event) =>
-                        setDiceCount(clampNumber(Number(event.target.value || 0), 1, 20))
-                      }
-                    />
-                  </label>
+                    <span className="dice-input-shell">
+                      <input
+                        type="number"
+                        min={1}
+                        max={20}
+                        inputMode="numeric"
+                        aria-label="Количество кубиков"
+                        value={diceCount}
+                        onChange={(event) => updateDiceCount(Number(event.target.value || 0))}
+                      />
+                      <span className="dice-stepper-actions">
+                        <button
+                          type="button"
+                          className="icon-button dice-stepper-button"
+                          onClick={() => updateDiceCount(diceCount - 1)}
+                          disabled={diceCount <= 1}
+                          aria-label="Уменьшить количество кубиков"
+                        >
+                          −
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-button dice-stepper-button"
+                          onClick={() => updateDiceCount(diceCount + 1)}
+                          disabled={diceCount >= 20}
+                          aria-label="Увеличить количество кубиков"
+                        >
+                          +
+                        </button>
+                      </span>
+                    </span>
+                  </div>
                   <button
                     type="button"
                     className="icon-button dice-roll-button"
@@ -1017,48 +1305,64 @@ export function GameMode({
                     🎲
                   </button>
                 </div>
-                <div className="dice-selection">
+                <div className="dice-selection" title={diceSelectionText}>
                   {selectedAttributeLabel && selectedAbilityLabel ? (
                     <>
-                      Выбор: <strong>{selectedAttributeLabel}</strong> +{" "}
-                      <strong>{selectedAbilityLabel}</strong>
-                      {woundMod !== 0 ? ` (штраф ранений ${woundMod})` : ""}.
+                      <strong>{selectedAttributeLabel}</strong> + <strong>{selectedAbilityLabel}</strong>
+                      {activeManeuver ? (
+                        <>
+                          {" · "}
+                          {activeManeuver.title}
+                          {activeManeuverBonus !== 0
+                            ? ` ${activeManeuverBonus > 0 ? "+" : ""}${activeManeuverBonus}`
+                            : ""}
+                        </>
+                      ) : null}
+                      {woundMod !== 0 ? (
+                        <>{" · "}ранения {woundMod > 0 ? "+" : ""}{woundMod}</>
+                      ) : null}
                     </>
                   ) : (
-                    "Кликните по атрибуту и способности, чтобы подставить кубики."
+                    "Выберите атрибут и способность"
                   )}
                 </div>
               </div>
-            {rollResult && (
-              <div className={`dice-result ${rollResult.status} ${diceRolling ? "is-rolling" : ""}`}>
-                <div className="dice-values">
-                    {rollResult.values.map((value, index) => {
-                      const isSuccess = value >= diceDifficulty;
-                      const isOne = value === 1;
-                      return (
-                        <span
-                          key={`${value}-${index}`}
-                          className={`dice-die ${isSuccess ? "success" : "fail"} ${isOne ? "one" : ""}`}
-                          style={diceRolling ? { animationDelay: `${index * 40}ms` } : undefined}
-                        >
-                          {value}
-                        </span>
-                      );
-                    })}
-                  </div>
-                  <div className="dice-summary">
-                    <span>Успехи: {Math.max(0, rollResult.net)}</span>
-                    <span>Единицы: {rollResult.ones}</span>
-                    <span className="dice-status">
-                      {rollResult.status === "success"
-                        ? "Успех"
-                        : rollResult.status === "botch"
-                          ? "Критический провал"
-                          : "Провал"}
-                    </span>
-                  </div>
+              <div
+                className={`dice-result ${rollResult?.status ?? "idle"} ${
+                  diceRolling ? "is-rolling" : ""
+                } ${rollResult ? "has-roll" : "is-empty"}`}
+              >
+                <div className="dice-result-meta-line">
+                  <span className="dice-result-status">{rollStatusLabel}</span>
+                  <span className="dice-result-stat dice-result-summary-successes">
+                    Успехи: <strong>{rollResult ? Math.max(0, rollResult.net) : "—"}</strong>
+                  </span>
+                  <span className="dice-result-stat dice-result-summary-ones">
+                    Единицы: <strong>{rollResult?.ones ?? "—"}</strong>
+                  </span>
                 </div>
-              )}
+                <div className="dice-values-board">
+                  {rollResult ? (
+                    <div className="dice-values">
+                      {rollResult.values.map((value, index) => {
+                        const isSuccess = value >= rollResult.difficulty;
+                        const isOne = value === 1;
+                        return (
+                          <span
+                            key={`${value}-${index}`}
+                            className={`dice-die ${isSuccess ? "success" : "fail"} ${isOne ? "one" : ""}`}
+                            style={diceRolling ? { animationDelay: `${index * 40}ms` } : undefined}
+                          >
+                            {value}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="dice-result-placeholder">Результат появится после броска</div>
+                  )}
+                </div>
+              </div>
             </div>
             <div className={`initiative-panel ${initiativeRolling ? "is-rolling" : ""}`}>
               <div className="initiative-title">
@@ -1079,21 +1383,34 @@ export function GameMode({
                 </button>
                 <button
                   type="button"
-                  className="icon-button initiative-roll-button"
-                  onClick={handleRollInitiativeNoWound}
-                  title="Бросить без штрафа ранений"
-                  aria-label="Бросить без штрафа ранений"
+                  className="icon-button initiative-edit-button"
+                  onClick={handleInitiativeEditStart}
+                  title="Редактировать инициативу"
+                  aria-label="Редактировать инициативу"
                 >
-                  🩹
+                  ✎
                 </button>
               </div>
-              <div className={`initiative-value ${initiativeRolling ? "is-rolling" : ""}`}>
-                {initiativeResult === null ? "—" : initiativeResult}
-              </div>
-                <div className="initiative-formula">
-                  Ловкость + Смекалка + d10
-                  {woundMod !== 0 ? ` + штраф ранений ${woundMod}` : ""}
+              {initiativeEditOpen ? (
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  autoFocus
+                  className="initiative-input"
+                  value={initiativeDraft}
+                  onChange={(event) => setInitiativeDraft(event.target.value)}
+                  onBlur={() => {
+                    void handleInitiativeEditSave();
+                  }}
+                  onKeyDown={handleInitiativeInputKeyDown}
+                  aria-label="Текущее значение инициативы"
+                />
+              ) : (
+                <div className={`initiative-value ${initiativeRolling ? "is-rolling" : ""}`}>
+                  {initiativeResult === null ? "—" : initiativeResult.total}
                 </div>
+              )}
+              <div className="initiative-formula">{initiativeFormula}</div>
             </div>
           </div>
         </div>
@@ -1105,7 +1422,7 @@ export function GameMode({
             {renderTraitList("Атрибуты", dictionaries.attributes, character.traits.attributes, true, {
               selectable: true,
               selectedKey: selectedAttributeKey,
-              onSelect: (key) => setSelectedAttributeKey((prev) => (prev === key ? null : key)),
+              onSelect: handleAttributeSelection,
               columns: true
             })}
           </div>
@@ -1266,212 +1583,7 @@ export function GameMode({
               </div>
             </div>
 
-            <div className={`guide-section collapsible-card ${meleeOpen ? "" : "collapsed"}`}>
-              <div className="collapsible-header guide-header">
-                <span>Манёвры: ближний бой</span>
-                <button
-                  type="button"
-                  className="icon-button collapsible-toggle"
-                  aria-expanded={meleeOpen}
-                  title={meleeOpen ? "Свернуть" : "Развернуть"}
-                  onClick={() => setMeleeOpen((prev) => !prev)}
-                >
-                  {meleeOpen ? "▾" : "▸"}
-                </button>
-              </div>
-              <div className="collapsible-content rule-block">
-                <ul className="rule-list">
-                  <li>Удар рукой (Ловкость + Драка); Сл6; Урон: Сила — ударный урон.</li>
-                  <li>Удар ногой (Ловкость + Драка); Сл7; Урон: Сила +1 — ударный урон.</li>
-                  <li>
-                    Удар оружием (Ловкость + Фехтование); Сл6; Урон: Сила + оружие — тип урона по
-                    оружию.
-                  </li>
-                  <li>
-                    Подсечка (Ловкость + Драка/Фехтование); Сл7; Урон: Сила — цель делает
-                    рефлекторную проверку Ловкость + Атлетика (Сл8) или падает. Возможна через
-                    фехтование, если оружием можно сбить с ног (дубинка/посох/цеп).
-                  </li>
-                  <li>
-                    Бросок (Сила + Драка); Сл7; Урон: Сила +1 — попытка сбить соперника с ног.
-                    После атаки и вы, и цель делаете рефлекторную проверку Ловкость + Атлетика
-                    (Сл7) или падаете. Даже если цель устояла, она теряет равновесие и получает +1
-                    к Сл действий на следующий ход.
-                  </li>
-                  <li>
-                    Разоружение (Ловкость + Фехтование); Сл7 — на успешной атаке бросьте урон как
-                    обычно. Если успехов на уроне больше Силы противника, урон не наносится, но
-                    оружие выбито. Иначе противник остаётся с оружием и получает обычный урон.
-                  </li>
-                  <li>
-                    Клинч (Сила + Драка); Сл6 — на успешной атаке входите в клинч. В первый ход
-                    можно бросить урон Сила. В следующие ходы можно либо автоматически наносить
-                    урон Сила, либо пытаться вырваться. Пока клинч держится, другие действия
-                    недоступны.
-                  </li>
-                  <li>
-                    Захват/удержание (Сила + Драка); Сл6 — урона не наносит. На успехе цель
-                    обездвижена до своего следующего действия. Тогда оба бросают встречный Сила +
-                    Драка; цель остаётся обездвиженной, пока не наберёт больше успехов, чем
-                    атакующий.
-                  </li>
-                  <li>
-                    Выход из клинча/захвата (Сила + Драка); Сл6 — встречная проверка. Если у
-                    вырывающегося больше успехов, он освобождается.
-                  </li>
-                  <li>
-                    Укус (Ловкость + Драка); Сл6; Урон: Сила +1 агравированного — доступен только
-                    после успешного клинча, захвата/удержания или tackle, и делается на следующем
-                    ходу. Вариант Kiss: вместо урона начать пить кровь; при желании после кормления
-                    след от укуса можно зализать.
-                  </li>
-                </ul>
-              </div>
-            </div>
-
-            <div className={`guide-section collapsible-card ${rangedOpen ? "" : "collapsed"}`}>
-              <div className="collapsible-header guide-header">
-                <span>Манёвры: дистанционный бой</span>
-                <button
-                  type="button"
-                  className="icon-button collapsible-toggle"
-                  aria-expanded={rangedOpen}
-                  title={rangedOpen ? "Свернуть" : "Развернуть"}
-                  onClick={() => setRangedOpen((prev) => !prev)}
-                >
-                  {rangedOpen ? "▾" : "▸"}
-                </button>
-              </div>
-              <div className="collapsible-content rule-block">
-                <ul className="rule-list">
-                  <li>Огнестрел: Ловкость + Стрельба. Метательное оружие: Ловкость + Атлетика.</li>
-                  <li>Параметр “Точность” = количество кубов, добавляемых к попаданию.</li>
-                  <li>Одиночный выстрел: Сл6.</li>
-                  <li>
-                    Огнестрел против вампиров: обычно наносит ударный урон. Прицельный выстрел в
-                    голову переводит его в летальный.
-                  </li>
-                  <li>
-                    Стрельба по‑македонски: Сл+1 для второй проверки; лёгкое оружие в каждой руке;
-                    разделите пул между выстрелами.
-                  </li>
-                  <li>Короткая очередь: Сл+1; Точность +2 — очередь из трёх патронов.</li>
-                  <li>
-                    Длинная очередь: Сл+2; Точность +10 — весь магазин, нужна перезарядка; в
-                    магазине должно быть не менее половины патронов.
-                  </li>
-                  <li>
-                    Обстрел: Сл+2; Точность +10 — полный магазин по зоне ~3 м; успехи распределяются
-                    между всеми целями (минимум по одному при наличии успехов), затем урон по каждой.
-                  </li>
-                  <li>
-                    Перезарядка — тратит весь ход. Вариант: проверка Ловкость + Стрельба (Сл7): 1
-                    успех для пистолета/ПП, 2 — для автомата/тяжёлого оружия; револьвер без
-                    спидлоадера/дробовик — 1 успех за каждый патрон (Сл4).
-                  </li>
-                  <li>
-                    Наведение — даёт +1 куб на следующую проверку стрельбы, можно накапливать до
-                    значения Восприятия. Оптический прицел добавляет +2 куба при первом наведении
-                    (не учитываются в лимите). Вариант: проверка Восприятие + Стрельба; при провале
-                    бонус не даётся.
-                  </li>
-                  <li>Выстрел в упор: Сл−2 (дистанция меньше 2 м).</li>
-                  <li>Выстрел вдаль: Сл+2 (дальность выше максимальной, но не более чем в 2 раза).</li>
-                  <li>
-                    Прицеливание: средняя цель Сл+1; маленькая Сл+2 и Урон +1; крошечная Сл+3 и
-                    Урон +2.
-                  </li>
-                </ul>
-              </div>
-            </div>
-
-            <div className={`guide-section collapsible-card ${defenseOpen ? "" : "collapsed"}`}>
-              <div className="collapsible-header guide-header">
-                <span>Манёвры: защита</span>
-                <button
-                  type="button"
-                  className="icon-button collapsible-toggle"
-                  aria-expanded={defenseOpen}
-                  title={defenseOpen ? "Свернуть" : "Развернуть"}
-                  onClick={() => setDefenseOpen((prev) => !prev)}
-                >
-                  {defenseOpen ? "▾" : "▸"}
-                </button>
-              </div>
-              <div className="collapsible-content rule-block">
-                <ul className="rule-list">
-                  <li>
-                    Уклонение (Ловкость + Атлетика); Сл6 — позволяет увернуться от атаки ближнего
-                    боя при наличии свободного места. В случае окружения со всех сторон не работает.
-                  </li>
-                  <li>
-                    Глухая оборона (full defense) — весь ход уходит только на защиту. Обычные
-                    правила множественных действий не применяются: первый блок/уклонение/парирование
-                    бросается полным пулом, каждый следующий защитный бросок в том же ходу — с
-                    кумулятивным штрафом −1 куб.
-                  </li>
-                  <li>
-                    Окружение: персонаж, который в ближнем бою сражается против нескольких
-                    соперников, получает +1 к сложности атаки и защиты за каждого противника после
-                    первого, максимум +4.
-                  </li>
-                  <li>
-                    Уклонение от выстрелов (Ловкость + Атлетика) — в V20 требует укрытия или
-                    перехода в положение лёжа. Вариант из Revised (Сл зависит от обстановки):
-                    <ul className="rule-list">
-                      <li>Уже в укрытии (только высунулся) — Сл2.</li>
-                      <li>Надёжное укрытие (в 1 м) — Сл4.</li>
-                      <li>Надёжное укрытие (в 3 м) — Сл6.</li>
-                      <li>Ненадёжное укрытие (в 1 м) — Сл6.</li>
-                      <li>Укрытия нет (падение в лёжку) — Сл8.</li>
-                    </ul>
-                    Адепты стремительности могут сдвигаться на 1 шаг вверх по таблице сложности.
-                  </li>
-                  <li>
-                    Парирование (Ловкость + Фехтование); Сл6 — блок атаки ближнего боя оружием. Если
-                    нападающий без холодного оружия, при большем числе успехов можно нанести урон,
-                    как при атаке.
-                  </li>
-                  <li>
-                    Блок (Ловкость + Драка); Сл6 — нивелирует успехи противника, как уклонение.
-                    Без брони или дисциплины Стойкость таким образом можно нейтрализовать только
-                    лёгкие повреждения.
-                  </li>
-                  <li>
-                    Домашнее правило: заменить Ловкость на Выносливость, а при наличии брони или
-                    Стойкости разрешить блокировать не только ближний бой, но и пули.
-                  </li>
-                </ul>
-              </div>
-            </div>
-
-            <div className={`guide-section collapsible-card ${multiOpen ? "" : "collapsed"}`}>
-              <div className="collapsible-header guide-header">
-                <span>Манёвры: множественные действия</span>
-                <button
-                  type="button"
-                  className="icon-button collapsible-toggle"
-                  aria-expanded={multiOpen}
-                  title={multiOpen ? "Свернуть" : "Развернуть"}
-                  onClick={() => setMultiOpen((prev) => !prev)}
-                >
-                  {multiOpen ? "▾" : "▸"}
-                </button>
-              </div>
-              <div className="collapsible-content rule-block">
-                <ul className="rule-list">
-                  <li>Заявите все действия в фазе декларации.</li>
-                  <li>Определите наименьший пул среди всех заявленных действий.</li>
-                  <li>Разделите этот наименьший пул между всеми действиями (минимум 1 куб на действие).</li>
-                  <li>Каждое действие бросается своим пулом.</li>
-                  <li>
-                    Если весь ход уходит только на защиту, используйте глухую оборону: обычные
-                    правила множественных действий не применяются; первый защитный бросок идёт полным
-                    пулом, каждый следующий — с кумулятивным штрафом −1 куб.
-                  </li>
-                </ul>
-              </div>
-            </div>
+            {GAME_MODE_MANEUVER_GUIDE_SECTIONS.map(renderManeuverGuideSection)}
           </div>
         </div>
 
@@ -1480,7 +1592,7 @@ export function GameMode({
             {renderTraitList("Способности", dictionaries.abilities, character.traits.abilities, true, {
               selectable: true,
               selectedKey: selectedAbilityKey,
-              onSelect: (key) => setSelectedAbilityKey((prev) => (prev === key ? null : key)),
+              onSelect: handleAbilitySelection,
               columns: true
             })}
           </div>
@@ -1582,6 +1694,16 @@ export function GameMode({
         </div>
       </div>
       </section>
+      <GameModeManeuversDrawer
+        open={maneuversOpen}
+        activeTab={activeManeuverTab}
+        expandedManeuverId={expandedManeuverId}
+        activeManeuverId={activeManeuverId}
+        onClose={() => setManeuversOpen(false)}
+        onTabChange={setActiveManeuverTab}
+        onExpandedManeuverChange={setExpandedManeuverId}
+        onApplyManeuver={handleApplyManeuver}
+      />
     </HelpPopoverGroup>
   );
 }

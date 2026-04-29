@@ -65,7 +65,15 @@ function normalizeInitiative(input: unknown, path: string, issues: ValidationIss
     return null;
   }
 
-  return result as CombatInitiativeDto;
+  if (input.manual !== undefined && typeof input.manual !== "boolean") {
+    issues.push({ path: `${path}.manual`, message: "РћР¶РёРґР°РµС‚СЃСЏ boolean" });
+    return null;
+  }
+
+  return {
+    ...result,
+    ...(input.manual ? { manual: true } : {})
+  } as CombatInitiativeDto;
 }
 
 export function normalizeCombatNpcPatch(input: unknown): {
